@@ -1,0 +1,17 @@
+{
+    "name": "api-gateway",
+    "version": "1.0.0",
+    "description": "API Gateway for Arroyo Seco Microservices",
+    "main": "server.js",
+    "scripts": {
+        "start": "node server.js",
+        "dev": "nodemon server.js"
+    },
+    "dependencies": {
+        "cors": "^2.8.5",
+        "dotenv": "^17.2.3",
+        "express": "^5.1.0",
+        "express-http-proxy": "^2.0.0",
+        "morgan": "^1.10.0"
+    }
+}
