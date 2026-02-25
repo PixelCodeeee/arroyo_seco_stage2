@@ -114,6 +114,13 @@ app.use('/api/paypal', proxy(PAYMENT_SERVICE, {
     proxyReqOptDecorator: (proxyReqOpts, srcReq) => {
         proxyReqOpts.headers['Content-Type'] = 'application/json';
         return proxyReqOpts;
+    },
+    userResHeaderDecorator(headers, userReq, userRes, proxyReq, proxyRes) {
+        // Explicitly set CORS headers to ensure they are present and singular
+        headers['access-control-allow-origin'] = '*';
+        headers['access-control-allow-methods'] = 'GET, POST, PUT, DELETE, OPTIONS';
+        headers['access-control-allow-headers'] = 'Content-Type, Authorization';
+        return headers;
     }
 }));
 
