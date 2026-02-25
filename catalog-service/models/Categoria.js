@@ -1,4 +1,4 @@
-const db = require('../config/db');
+const { promisePool: db } = require('../config/db');
 
 class Categoria {
     static async create({ nombre, tipo }) {

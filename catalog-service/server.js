@@ -93,7 +93,11 @@ async function initDB() {
 }
 
 // Start server
-app.listen(PORT, async () => {
-    await initDB();
-    console.log(`Catalog Service running on port ${PORT}`);
-});
+if (require.main === module) {
+    app.listen(PORT, async () => {
+        await initDB();
+        console.log(`Catalog Service running on port ${PORT}`);
+    });
+}
+
+module.exports = app;

@@ -129,14 +129,19 @@ app.get('/', (req, res) => {
     res.send('Arroyo Seco API Gateway Running');
 });
 
-// Start Gateway
-app.listen(PORT, () => {
-    console.log(`API Gateway running on port ${PORT}`);
-    console.log(`Proxies:
+// Only start the server if this file is run directly (not during tests)
+if (require.main === module) {
+    app.listen(PORT, () => {
+        console.log(`API Gateway running on port ${PORT}`);
+        console.log(`Proxies:
     - Auth: ${AUTH_SERVICE}
     - Catalog: ${CATALOG_SERVICE}
     - Orders: ${ORDER_SERVICE}
     - Reservations: ${RESERVATION_SERVICE}
     - Payments: ${PAYMENT_SERVICE}
     `);
-});
+    });
+}
+
+// Export the app for Supertest
+module.exports = app;
