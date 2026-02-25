@@ -1,0 +1,39 @@
+name: Node.js CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false # Keep running other services if one fails
+      matrix:
+        node-version: [22.20.0, 18.x]
+        # LIST YOUR MICROSERVICE FOLDER NAMES BELOW
+        service: [ 'api-gateway', 'auth-service', 'catalog-service', 'order-service','payment-service', 'reservation-service' ]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+        # distinct cache for each service to avoid conflicts
+        cache-dependency-path: './${{ matrix.service }}/package-lock.json' 
+
+    - name: Install dependencies
+      # We use 'working-directory' to step into the folder
+      working-directory: ./${{ matrix.service }}
+      run: npm ci 
+      # Note: 'npm ci' is faster/cleaner for CI than 'npm install'
+
+    - name: Run Jest tests
+      working-directory: ./${{ matrix.service }}
+      run: npm test
