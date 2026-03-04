@@ -72,6 +72,6 @@ jobs:
         with:
           filename: tests/k6-load-test.js
           cloud: true
+          token: ${{ secrets.K6_CLOUD_TOKEN }}
         env:
-          K6_CLOUD_TOKEN: ${{ secrets.K6_CLOUD_TOKEN }}
           K6_PROJECT_ID: ${{ secrets.K6_PROJECT_ID }} # Optional: If you prefer to pass it as env var instead of hardcoding in script
