@@ -34,17 +34,3 @@ jobs:
     - name: Run Jest tests
       working-directory: ./${{ matrix.service }}
       run: npm test
-
-  # LOAD TEST JOB (Runs independently)
-  load-test:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Run k6 Cloud Test
-        uses: grafana/k6-action@v0.3.1
-        with:
-          filename: k6-script.js # <--- Make sure this filename is correct!
-          cloud: true
-          token: ${{ secrets.K6_CLOUD_TOKEN }}

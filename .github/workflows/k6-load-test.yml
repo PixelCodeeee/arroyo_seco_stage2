@@ -44,7 +44,7 @@ jobs:
       - name: Install Dependencies
         run: |
           npm ci || true
-          cd microservices/api-gateway && npm install
+          cd api-gateway && npm install
           cd ../auth-service && npm install
           cd ../catalog-service && npm install
           cd ../order-service && npm install
@@ -54,13 +54,13 @@ jobs:
       - name: Start Services
         run: |
           # Iniciando servicios en background
-          cd microservices/auth-service && node server.js &
-          cd microservices/catalog-service && node server.js &
-          cd microservices/order-service && node server.js &
-          cd microservices/payment-service && node server.js &
-          cd microservices/reservation-service && node server.js &
+          cd auth-service && node server.js &
+          cd ../catalog-service && node server.js &
+          cd ../order-service && node server.js &
+          cd ../payment-service && node server.js &
+          cd ../reservation-service && node server.js &
           sleep 10
-          cd microservices/api-gateway && node server.js &
+          cd ../api-gateway && node server.js &
           sleep 15 # Esperar a que el gateway levante completamente
           curl -f http://localhost:5000/health || echo "Gateway is not fully up yet"
 
@@ -71,7 +71,7 @@ jobs:
         uses: grafana/k6-action@v0.3.1
         with:
           filename: tests/k6-load-test.js
-          flags: --out cloud
+          cloud: true
         env:
           K6_CLOUD_TOKEN: ${{ secrets.K6_CLOUD_TOKEN }}
           K6_PROJECT_ID: ${{ secrets.K6_PROJECT_ID }} # Optional: If you prefer to pass it as env var instead of hardcoding in script
