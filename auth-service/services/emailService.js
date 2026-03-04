@@ -14,7 +14,7 @@ class EmailService {
     async send2FACode(email, code, userName) {
         try {
             const response = await this.resend.emails.send({
-                from: 'Arroyo Seco <onboarding@resend.dev>',
+                from: 'Arroyo Seco <noreply@arroyoseco.online>',
                 to: email,
                 subject: 'Código de verificación - Arroyo Seco',
                 html: `
