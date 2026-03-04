@@ -4,7 +4,7 @@ import { check, sleep } from 'k6';
 export const options = {
     ext: {
         loadimpact: {
-            projectID: __ENV.K6_PROJECT_ID || 123456, // Replace with your Grafana Cloud project ID
+            projectID: __ENV.K6_PROJECT_ID || 6892288, // Replace with your Grafana Cloud project ID
             name: 'Arroyo Seco Backend Load Test'
         }
     },
