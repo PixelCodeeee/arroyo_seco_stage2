@@ -1,0 +1,101 @@
+version: '3.8'
+
+services:
+  # 1. The Database
+  mysql-db:
+    image: mysql:8.0
+    restart: always
+    environment:
+      # Update these placeholders with your actual secure credentials
+      MYSQL_ROOT_PASSWORD: secure_root_password
+      MYSQL_DATABASE: my_database
+      MYSQL_USER: db_user
+      MYSQL_PASSWORD: db_password
+    volumes:
+      - ../init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
+      - mysql_data:/var/lib/mysql
+
+  # 2. Your API Gateway (The only backend service the frontend / Native NGINX talks to)
+  api-gateway:
+    build: ./api-gateway
+    restart: always
+    ports:
+      - "5000:5000" # Exposing the gateway so Native NGINX can reach it over VPC (port 5000)
+    depends_on:
+      - auth-service
+      - catalog-service
+      - order-service
+      - reservation-service
+      - payment-service
+    environment:
+      - AUTH_SERVICE_URL=http://auth-service:5001
+      - CATALOG_SERVICE_URL=http://catalog-service:5002
+      - ORDER_SERVICE_URL=http://order-service:5003
+      - RESERVATION_SERVICE_URL=http://reservation-service:5004
+      - PAYMENT_SERVICE_URL=http://payment-service:5005
+
+  # 3. Your Internal Microservices
+  auth-service:
+    build: ./auth-service
+    restart: always
+    depends_on:
+      - mysql-db
+    environment:
+      - DB_HOST=mysql-db
+      - DB_USER=db_user
+      - DB_PASSWORD=db_password
+      - DB_NAME=my_database
+      - PORT=5001
+      - JWT_SECRET=your_jwt_secret_key # Replace with your actual secret
+
+  catalog-service:
+    build: ./catalog-service
+    restart: always
+    depends_on:
+      - mysql-db
+    environment:
+      - DB_HOST=mysql-db
+      - DB_USER=db_user
+      - DB_PASSWORD=db_password
+      - DB_NAME=my_database
+      - PORT=5002
+
+  order-service:
+    build: ./order-service
+    restart: always
+    depends_on:
+      - mysql-db
+    environment:
+      - DB_HOST=mysql-db
+      - DB_USER=db_user
+      - DB_PASSWORD=db_password
+      - DB_NAME=my_database
+      - PORT=5003
+
+  reservation-service:
+    build: ./reservation-service
+    restart: always
+    depends_on:
+      - mysql-db
+    environment:
+      - DB_HOST=mysql-db
+      - DB_USER=db_user
+      - DB_PASSWORD=db_password
+      - DB_NAME=my_database
+      - PORT=5004
+
+  payment-service:
+    build: ./payment-service
+    restart: always
+    depends_on:
+      - mysql-db
+    environment:
+      - DB_HOST=mysql-db
+      - DB_USER=db_user
+      - DB_PASSWORD=db_password
+      - DB_NAME=my_database
+      - PORT=5005
+
+# Persistent storage for MySQL so you don't lose data on container restart
+volumes:
+  mysql_data:
