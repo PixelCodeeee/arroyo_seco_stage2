@@ -364,3 +364,18 @@ exports.eliminarReserva = async (req, res) => {
         res.status(500).json({ error: 'Error al eliminar reserva' });
     }
 };
+
+// Top servicios más reservados (recomendaciones)
+exports.getTopServicios = async (req, res) => {
+    try {
+        const limit = parseInt(req.query.limit) || 10;
+        const servicios = await Reserva.getTopServicios(limit);
+        res.json({
+            total: servicios.length,
+            servicios
+        });
+    } catch (error) {
+        console.error('Error fetching top servicios:', error);
+        res.status(500).json({ error: 'Error al obtener top servicios' });
+    }
+};

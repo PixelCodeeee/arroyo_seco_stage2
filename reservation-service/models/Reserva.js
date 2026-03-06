@@ -254,6 +254,40 @@ class Reserva {
         );
         return rows.length === 0;
     }
+
+    // Top servicios más reservados (para recomendaciones)
+    static async getTopServicios(limit = 10) {
+        const [rows] = await db.query(`
+            SELECT
+                s.id_servicio,
+                s.nombre as nombre_servicio,
+                s.descripcion,
+                s.rango_precio,
+                s.capacidad,
+                s.imagenes,
+                o.id_oferente,
+                o.nombre_negocio,
+                o.tipo as tipo_oferente,
+                COUNT(r.id_reserva) as total_reservas,
+                COUNT(DISTINCT r.id_usuario) as total_visitantes
+            FROM reserva r
+            INNER JOIN servicio_restaurante s ON r.id_servicio = s.id_servicio
+            INNER JOIN oferente o ON s.id_oferente = o.id_oferente
+            WHERE r.estado IN ('confirmada', 'pendiente')
+            AND r.fecha_creacion >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+            GROUP BY s.id_servicio
+            ORDER BY total_reservas DESC
+            LIMIT ?
+        `, [limit]);
+
+        return rows.map(row => ({
+            ...row,
+            imagenes: (() => {
+                try { return typeof row.imagenes === 'string' ? JSON.parse(row.imagenes) : (row.imagenes || []); }
+                catch { return []; }
+            })()
+        }));
+    }
 }
 
 module.exports = Reserva;
