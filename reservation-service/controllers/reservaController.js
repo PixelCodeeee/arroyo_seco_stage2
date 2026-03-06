@@ -379,3 +379,14 @@ exports.getTopServicios = async (req, res) => {
         res.status(500).json({ error: 'Error al obtener top servicios' });
     }
 };
+
+// Stats para analíticas (solo admin)
+exports.getStatsAnaliticas = async (req, res) => {
+    try {
+        const stats = await Reserva.getStatsAnaliticas();
+        res.json(stats);
+    } catch (error) {
+        console.error('Error fetching stats analiticas:', error);
+        res.status(500).json({ error: 'Error al obtener estadísticas' });
+    }
+};

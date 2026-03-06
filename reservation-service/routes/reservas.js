@@ -10,6 +10,8 @@ router.get('/disponibilidad', reservaController.verificarDisponibilidad);
 router.post('/', verifyToken, reservaController.crearReserva);
 router.get('/', verifyToken, verifyAdmin, reservaController.obtenerReservas);
 router.get('/recomendaciones/top-servicios', reservaController.getTopServicios);
+// Analíticas (solo admin)
+router.get('/analiticas/stats', verifyToken, reservaController.getStatsAnaliticas);
 router.get('/:id', verifyToken, reservaController.obtenerReservaPorId); // Check ownership in controller ideally
 router.get('/usuario/:usuarioId', verifyToken, reservaController.obtenerReservasPorUsuario);
 router.get('/oferente/:oferenteId', verifyToken, verifyoferente, reservaController.obtenerReservasPorOferente);

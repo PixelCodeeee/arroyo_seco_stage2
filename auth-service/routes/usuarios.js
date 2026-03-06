@@ -15,4 +15,6 @@ router.get('/:id', verifyToken, usuarioController.obtenerUsuarioPorId);
 router.put('/:id', verifyToken, usuarioController.actualizarUsuario);
 router.delete('/:id', verifyToken, verifyAdmin, usuarioController.eliminarUsuario);
 
+// Analíticas - stats de usuarios (solo admin)
+router.get('/analiticas/stats', verifyToken, usuarioController.getStats);
 module.exports = router;

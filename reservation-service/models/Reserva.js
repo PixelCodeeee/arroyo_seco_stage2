@@ -288,6 +288,33 @@ class Reserva {
             })()
         }));
     }
+
+    // Stats completos para analíticas
+static async getStatsAnaliticas() {
+    const [stats] = await db.query(`
+        SELECT
+            COUNT(*) as total_reservas,
+            SUM(CASE WHEN estado = 'pendiente' THEN 1 ELSE 0 END) as pendientes,
+            SUM(CASE WHEN estado = 'confirmada' THEN 1 ELSE 0 END) as confirmadas,
+            SUM(CASE WHEN estado = 'cancelada' THEN 1 ELSE 0 END) as canceladas,
+            SUM(numero_personas) as total_personas
+        FROM reserva
+        WHERE fecha_creacion >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+    `);
+
+    const [reservasPorMes] = await db.query(`
+        SELECT
+            DATE_FORMAT(fecha_creacion, '%Y-%m') as mes,
+            DATE_FORMAT(fecha_creacion, '%b %Y') as mes_label,
+            COUNT(*) as total_reservas
+        FROM reserva
+        WHERE fecha_creacion >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
+        GROUP BY DATE_FORMAT(fecha_creacion, '%Y-%m'), DATE_FORMAT(fecha_creacion, '%b %Y')
+        ORDER BY mes ASC
+    `);
+
+    return { ...stats[0], reservasPorMes };
+}
 }
 
 module.exports = Reserva;

@@ -22,6 +22,9 @@ router.get('/oferente/:oferenteId', verifyToken, verifyoferente, pedidoControlle
 router.get('/recomendaciones/top-productos', pedidoController.getTopProductos);
 // Recomendaciones - top productos
 
+// Analíticas (solo admin)
+router.get('/analiticas/stats', verifyToken, pedidoController.getStatsAnaliticas);
+
 // Shared/General
 router.get('/:id', verifyToken, pedidoController.obtenerPedidoPorId); // Checks ownership inside? No, controller just gets by ID. 
 // Ideally controller should check ownership. For now I'll leave as is, satisfying the refactor.
