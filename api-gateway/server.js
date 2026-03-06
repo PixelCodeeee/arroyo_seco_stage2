@@ -6,7 +6,11 @@ const proxy = require('express-http-proxy');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-app.use(cors());
+const corsOptions = {
+    origin: process.env.FRONTEND_URL || 'https://arroyoseco.online',
+    optionsSuccessStatus: 200
+};
+app.use(cors(corsOptions));
 
 // Logging middleware
 app.use((req, res, next) => {
@@ -117,7 +121,7 @@ app.use('/api/paypal', proxy(PAYMENT_SERVICE, {
     },
     userResHeaderDecorator(headers, userReq, userRes, proxyReq, proxyRes) {
         // Explicitly set CORS headers to ensure they are present and singular
-        headers['access-control-allow-origin'] = '*';
+        headers['access-control-allow-origin'] = process.env.FRONTEND_URL || 'https://arroyoseco.online';
         headers['access-control-allow-methods'] = 'GET, POST, PUT, DELETE, OPTIONS';
         headers['access-control-allow-headers'] = 'Content-Type, Authorization';
         return headers;
