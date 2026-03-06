@@ -2,14 +2,14 @@ version: '3.8'
 
 services:
   # 1. The Database
-mysql-db:
+  mysql-db:
     image: mysql:8.0
     restart: always
     environment:
-      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"  # Tells MySQL to allow blank passwords
-      MYSQL_DATABASE: arroyo_seco        # Must perfectly match your init_db.sql!
-      MYSQL_USER: db_user                # The user your Node.js app logs in as
-      MYSQL_PASSWORD: ""                 # Explicitly setting a blank password
+      MYSQL_ALLOW_EMPTY_PASSWORD: "yes" # Tells MySQL to allow blank passwords
+      MYSQL_DATABASE: arroyo_seco # Must perfectly match your init_db.sql!
+      MYSQL_USER: db_user # The user your Node.js app logs in as
+      MYSQL_PASSWORD: "" # Explicitly setting a blank password
     volumes:
       - ./init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
       - mysql_data:/var/lib/mysql
