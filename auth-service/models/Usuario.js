@@ -117,6 +117,37 @@ class Usuario {
         const [usuarios] = await db.query(query, params);
         return usuarios.length > 0;
     }
+
+    // Stats para analíticas
+static async getStats() {
+    const [rows] = await db.query(`
+        SELECT
+            COUNT(*) as total_usuarios,
+            SUM(CASE WHEN rol = 'turista' THEN 1 ELSE 0 END) as turistas,
+            SUM(CASE WHEN rol = 'oferente' THEN 1 ELSE 0 END) as oferentes,
+            SUM(CASE WHEN rol = 'admin' THEN 1 ELSE 0 END) as admins,
+            SUM(CASE WHEN esta_activo = 1 THEN 1 ELSE 0 END) as activos
+        FROM usuario
+    `);
+    return rows[0];
 }
+
+// Usuarios registrados por mes (últimos 6 meses)
+static async getRegistrosPorMes() {
+    const [rows] = await db.query(`
+        SELECT
+            DATE_FORMAT(fecha_creacion, '%Y-%m') as mes,
+            DATE_FORMAT(fecha_creacion, '%b %Y') as mes_label,
+            COUNT(*) as total
+        FROM usuario
+        WHERE fecha_creacion >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
+        GROUP BY DATE_FORMAT(fecha_creacion, '%Y-%m'), DATE_FORMAT(fecha_creacion, '%b %Y')
+        ORDER BY mes ASC
+    `);
+    return rows;
+}
+}
+
+
 
 module.exports = Usuario;
