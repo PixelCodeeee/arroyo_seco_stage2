@@ -308,6 +308,37 @@ class Pedido {
         );
         return rows[0];
     }
+
+    // Top productos mas vendidos (para recomendaciones)
+    static async getTopProductos(limit = 10) {
+        const [rows] = await db.query(`
+            SELECT
+                prod.id_producto,
+                prod.nombre as nombre_producto,
+                prod.descripcion,
+                prod.imagenes,
+                prod.precio,
+                o.id_oferente,
+                o.nombre_negocio,
+                o.tipo as tipo_oferente,
+                SUM(ip.cantidad) as total_vendido,
+                COUNT(DISTINCT p.id_usuario) as total_compradores
+            FROM item_pedido ip
+            INNER JOIN pedido p ON ip.id_pedido = p.id_pedido
+            INNER JOIN producto prod ON ip.id_producto = prod.id_producto
+            INNER JOIN oferente o ON prod.id_oferente = o.id_oferente
+            WHERE p.estado IN ('pagado', 'enviado', 'completado')
+            AND p.fecha_creacion >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+            GROUP BY prod.id_producto
+            ORDER BY total_vendido DESC
+            LIMIT ?
+        `, [limit]);
+
+        return rows.map(row => ({
+            ...row,
+            imagenes: this.parseImagenes(row.imagenes)
+        }));
+    }
 }
 
 module.exports = Pedido;

@@ -28,4 +28,4 @@ pool.getConnection((err, connection) => {
     connection.release();
 });
 
-module.exports = { promisePool, pool };
+module.exports = promisePool;
