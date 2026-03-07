@@ -26,12 +26,14 @@ services:
       - order-service
       - reservation-service
       - payment-service
+      - announcements-service
     environment:
       - AUTH_SERVICE_URL=http://auth-service:5001
       - CATALOG_SERVICE_URL=http://catalog-service:5002
       - ORDER_SERVICE_URL=http://order-service:5003
       - RESERVATION_SERVICE_URL=http://reservation-service:5004
       - PAYMENT_SERVICE_URL=http://payment-service:5005
+      - ANNOUNCEMENTS_SERVICE_URL=http://announcements-service:5006
 
   # 3. Your Internal Microservices
   auth-service:
@@ -94,6 +96,18 @@ services:
       - DB_PASSWORD=arroyo_password
       - DB_NAME=arroyo_seco
       - PORT=5005
+
+  announcements-service:
+    build: ./announcements-service
+    restart: always
+    depends_on:
+      - mysql-db
+    environment:
+      - DB_HOST=mysql-db
+      - DB_USER=db_user
+      - DB_PASSWORD=arroyo_password
+      - DB_NAME=arroyo_seco
+      - PORT=5006
 
 volumes:
   mysql_data:
