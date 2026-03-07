@@ -15,6 +15,9 @@ Start-Process powershell -ArgumentList "cd microservices/reservation-service; np
 Write-Host "Starting Payment Service..."
 Start-Process powershell -ArgumentList "cd microservices/payment-service; npm start"
 
+Write-Host "Starting Announcements Service..."
+Start-Process powershell -ArgumentList "cd microservices/announcements-service; npm run dev"
+
 Write-Host "Starting API Gateway..."
 Start-Process powershell -ArgumentList "cd microservices/api-gateway; npm start"
 
