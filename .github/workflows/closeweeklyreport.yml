@@ -1,0 +1,40 @@
+name: Close Weekly Sprint Report
+
+on:
+  workflow_dispatch: 
+  schedule:
+    - cron: '30 22 * * 5' # 22:30 UTC = 4:30 PM CST on Friday (5)
+
+jobs:
+  close_weekly_issue:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Close the Weekly Report
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'weekly-sprint-report' // <--- Only targets the weekly reports
+            });
+            
+            for (const issue of issues.data) {
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                state: 'closed',
+                state_reason: 'completed'
+              });
+              
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body: '🏁 **Sprint window closed (4:30 PM).** Great work this week, everyone! Have a great weekend.'
+              });
+            }
