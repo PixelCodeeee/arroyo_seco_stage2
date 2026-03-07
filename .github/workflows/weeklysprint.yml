@@ -1,0 +1,47 @@
+name: Open Weekly Sprint Report
+
+on:
+  workflow_dispatch: # Allows manual testing
+  schedule:
+    - cron: '0 16 * * 5' # 16:00 UTC = 10:00 AM CST on Friday (5)
+
+jobs:
+  create_weekly_report:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Get current date
+        id: date
+        run: echo "date=$(date +'%A, %B %d, %Y')" >> $GITHUB_ENV
+
+      - name: Create Weekly Sprint Issue
+        uses: imjohnbo/issue-bot@v3
+        with:
+          assignees: "Karenn204, MargothR, vane553, YannyMor, itsjluna" 
+          labels: "weekly-sprint-report"
+          title: "Weekly Sprint Report - ${{ env.date }}"
+          body: |
+            Good morning team! @Karenn204 @MargothR @vane553 @YannyMor @itsjluna
+            
+            It is time for our weekly review. Please reply to this thread by **4:30 PM QUERETARO TIME** with your sprint summary. 
+            
+            Copy and paste the template below into your comment and fill it out:
+            
+            ---
+            ### Weekly Sprint Template
+            
+            **Sprint Name:** [e.g., Arroyo Seco Sprint 1]
+            **Responsible:** [Your Name]
+            
+            **Task(s) Name:** - 
+            
+            **Description of Tasks:** - 
+            
+            **Objectives:** - 
+            
+            **Obstacles:** - 
+            
+            **Solutions:** - 
+            
+            **Evidence Attached:** *(Drag and drop your screenshots, videos, or files right here!)*
