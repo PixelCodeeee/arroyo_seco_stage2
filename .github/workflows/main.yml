@@ -3,7 +3,7 @@ name: Automated Daily Audit - ADA SYSTEM
 # This schedule uses UTC time. 
 # 14:00 UTC is 8:00 AM in Querétaro (CST).
 on:
-  workflow_dispatch: # Allows you to run this manually to test it!
+  workflow_dispatch: # Manual testing
   schedule:
     - cron: '0 14 * * 1-5' # Runs Monday to Friday at 8:00 AM CST
 
@@ -24,7 +24,7 @@ jobs:
           labels: "daily-standup"
           title: "Daily Standup ☕ - ${{ env.date }}"
           body: |
-            Good morning team! @Karenn204 @MargothR @vane553 @YannyMor @itsjluna
+            Good morning, @Karenn204 @MargothR @vane553 @YannyMor @itsjluna
             
             Please reply to this thread by **06:00 PM QUERETARO TIME** with your standup update. 
             
