@@ -1,0 +1,42 @@
+name: Close Daily Standup
+
+# 00:00 UTC corresponds to 06:00 PM (18:00) CST in Querétaro the previous day.
+# To trigger at 6 PM Mon-Fri locally, we run it at Midnight Tue-Sat in UTC.
+on:
+  workflow_dispatch: # Allows you to manually trigger the close action for testing!
+  schedule:
+    - cron: '0 0 * * 2-6'
+
+jobs:
+  close_issue:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Close the Standup Issue
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'daily-standup'
+            });
+            
+            for (const issue of issues.data) {
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                state: 'closed',
+                state_reason: 'not_planned'
+              });
+              
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body: '**Time window closed (06:00 PM).** The daily standup is now locked for the day.'
+              });
+            }
