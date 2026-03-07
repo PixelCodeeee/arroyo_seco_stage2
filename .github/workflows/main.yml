@@ -20,11 +20,11 @@ jobs:
       - name: Create Standup Issue
         uses: imjohnbo/issue-bot@v3
         with:
-          assignees: "Karenn204, MargothR, vane553, YannyMor, PixelCodeeee"
+          assignees: "Karenn204, MargothR, vane553, YannyMor, itsjluna" 
           labels: "daily-standup"
           title: "Daily Standup ☕ - ${{ env.date }}"
           body: |
-            Good morning team! @here
+            Good morning team! @Karenn204 @MargothR @vane553 @YannyMor @itsjluna
             
             Please reply to this thread by **06:00 PM QUERETARO TIME** with your standup update. 
             
