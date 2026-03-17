@@ -53,17 +53,28 @@ jobs:
 
       - name: Start Services
         run: |
-          # Iniciando servicios en background
-          cd auth-service && node server.js &
-          cd ../catalog-service && node server.js &
-          cd ../order-service && node server.js &
-          cd ../payment-service && node server.js &
-          cd ../reservation-service && node server.js &
+          # Wrap in parentheses to use subshells so the main script stays in the root directory
+          (cd auth-service && node server.js > ../auth.log 2>&1) &
+          (cd catalog-service && node server.js > ../catalog.log 2>&1) &
+          (cd order-service && node server.js > ../order.log 2>&1) &
+          (cd payment-service && node server.js > ../payment.log 2>&1) &
+          (cd reservation-service && node server.js > ../reservation.log 2>&1) &
+          
           sleep 10
-          cd ../api-gateway && node server.js &
-          sleep 15 # Esperar a que el gateway levante completamente
-          curl -f http://localhost:5000/health || echo "Gateway is not fully up yet"
-
+          
+          (cd api-gateway && node server.js > ../gateway.log 2>&1) &
+          
+          sleep 15 
+          
+          # Strictly check if the gateway is up. We are still in the root dir, so logs are right here.
+          if ! curl -f http://localhost:5000/health; then
+            echo "❌ API Gateway failed to start! Printing logs:"
+            echo "--- Gateway Logs ---"
+            cat gateway.log || echo "gateway.log not found"
+            echo "--- Auth Logs ---"
+            cat auth.log || echo "auth.log not found"
+            exit 1 
+          fi
       - name: Setup K6
         uses: grafana/setup-k6-action@v1
 
@@ -71,7 +82,8 @@ jobs:
         uses: grafana/k6-action@v0.3.1
         with:
           filename: tests/k6-load-test.js
-          cloud: true
+          flags: --out cloud
           token: ${{ secrets.K6_CLOUD_TOKEN }}
         env:
           K6_PROJECT_ID: ${{ secrets.K6_PROJECT_ID }} # Optional: If you prefer to pass it as env var instead of hardcoding in script
+          API_URL: http://172.17.0.1:5000
