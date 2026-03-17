@@ -53,12 +53,17 @@ jobs:
 
       - name: Start Services
         run: |
-          # Wrap in parentheses to use subshells so the main script stays in the root directory
-          (cd auth-service && node server.js > ../auth.log 2>&1) &
-          (cd catalog-service && node server.js > ../catalog.log 2>&1) &
-          (cd order-service && node server.js > ../order.log 2>&1) &
-          (cd payment-service && node server.js > ../payment.log 2>&1) &
-          (cd reservation-service && node server.js > ../reservation.log 2>&1) &
+          # Injecting DB environment variables so the services can connect
+          export DB_HOST=127.0.0.1
+          export DB_USER=root
+          export DB_PASS='AlphaPrime1.'
+          export DB_NAME=arroyo_seco
+
+          (cd auth-service && DB_HOST=$DB_HOST DB_USER=$DB_USER DB_PASS=$DB_PASS DB_NAME=$DB_NAME node server.js > ../auth.log 2>&1) &
+          (cd catalog-service && DB_HOST=$DB_HOST DB_USER=$DB_USER DB_PASS=$DB_PASS DB_NAME=$DB_NAME node server.js > ../catalog.log 2>&1) &
+          (cd order-service && DB_HOST=$DB_HOST DB_USER=$DB_USER DB_PASS=$DB_PASS DB_NAME=$DB_NAME node server.js > ../order.log 2>&1) &
+          (cd payment-service && DB_HOST=$DB_HOST DB_USER=$DB_USER DB_PASS=$DB_PASS DB_NAME=$DB_NAME node server.js > ../payment.log 2>&1) &
+          (cd reservation-service && DB_HOST=$DB_HOST DB_USER=$DB_USER DB_PASS=$DB_PASS DB_NAME=$DB_NAME node server.js > ../reservation.log 2>&1) &
           
           sleep 10
           
@@ -66,13 +71,8 @@ jobs:
           
           sleep 15 
           
-          # Strictly check if the gateway is up. We are still in the root dir, so logs are right here.
           if ! curl -f http://localhost:5000/health; then
-            echo "❌ API Gateway failed to start! Printing logs:"
-            echo "--- Gateway Logs ---"
-            cat gateway.log || echo "gateway.log not found"
-            echo "--- Auth Logs ---"
-            cat auth.log || echo "auth.log not found"
+            echo "❌ API Gateway failed to start!"
             exit 1 
           fi
       - name: Setup K6
