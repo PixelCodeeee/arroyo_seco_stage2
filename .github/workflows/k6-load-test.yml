@@ -53,17 +53,25 @@ jobs:
 
       - name: Start Services
         run: |
-          # Iniciando servicios en background
-          cd auth-service && node server.js &
-          cd ../catalog-service && node server.js &
-          cd ../order-service && node server.js &
-          cd ../payment-service && node server.js &
-          cd ../reservation-service && node server.js &
+          # Start services and redirect their output to log files
+          cd auth-service && node server.js > ../auth.log 2>&1 &
+          cd ../catalog-service && node server.js > ../catalog.log 2>&1 &
+          cd ../order-service && node server.js > ../order.log 2>&1 &
+          cd ../payment-service && node server.js > ../payment.log 2>&1 &
+          cd ../reservation-service && node server.js > ../reservation.log 2>&1 &
           sleep 10
-          cd ../api-gateway && node server.js &
-          sleep 15 # Esperar a que el gateway levante completamente
-          curl -f http://localhost:5000/health || echo "Gateway is not fully up yet"
-
+          cd ../api-gateway && node server.js > ../gateway.log 2>&1 &
+          sleep 15 
+          
+          # Strictly check if the gateway is up. If it fails, print the crash logs and stop.
+          if ! curl -f http://localhost:5000/health; then
+            echo "❌ API Gateway failed to start! Printing gateway logs:"
+            cat ../gateway.log
+            echo "---"
+            echo "Auth Service logs:"
+            cat ../auth.log
+            exit 1 # Force the workflow to fail here instead of moving to K6
+          fi
       - name: Setup K6
         uses: grafana/setup-k6-action@v1
 
