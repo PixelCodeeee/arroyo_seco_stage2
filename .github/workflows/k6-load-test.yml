@@ -53,7 +53,7 @@ jobs:
           cd ../payment-service && npm install
           cd ../reservation-service && npm install
 
-      - - name: Start Services
+      - name: Start Services
         run: |
           # 🚨 Removed 'export PORT=5002' so it doesn't hijack the API Gateway!
           export DB_HOST=127.0.0.1
