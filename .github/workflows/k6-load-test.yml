@@ -53,10 +53,9 @@ jobs:
           cd ../payment-service && npm install
           cd ../reservation-service && npm install
 
-      - name: Start Services
+      - - name: Start Services
         run: |
-          # 🚨 Injecting your exact production variables (Blank Password)
-          export PORT=5002 # Setting specifically for catalog
+          # 🚨 Removed 'export PORT=5002' so it doesn't hijack the API Gateway!
           export DB_HOST=127.0.0.1
           export DB_USER=root
           export DB_PASSWORD=''
@@ -71,19 +70,21 @@ jobs:
           
           sleep 10
           
+          # The gateway will naturally default to 5000 now
           (cd api-gateway && node server.js > ../gateway.log 2>&1) &
           
           sleep 15 
           
           if ! curl -f http://localhost:5000/health; then
-            echo "❌ API Gateway failed to start!"
+            echo "❌ API Gateway failed to start! Printing logs:"
+            cat gateway.log
             exit 1 
           fi
 
-          # 🚨 Temporarily changed this to print the Gateway logs if it 404s
-          echo "Testing /products endpoint..."
-          if ! curl -f http://localhost:5000/products; then
-            echo "❌ /products endpoint failed! Printing API Gateway logs:"
+          # 🚨 Updated to hit the Spanish route that your Gateway actually uses
+          echo "Testing /api/productos endpoint..."
+          if ! curl -f http://localhost:5000/api/productos; then
+            echo "❌ /api/productos endpoint failed! Printing API Gateway logs:"
             echo "--- Gateway Logs ---"
             cat gateway.log
             exit 1
