@@ -9,7 +9,7 @@ on:
     branches:
       - master
       - main
-  workflow_dispatch: # Permite ejecutar el workflow manualmente
+  workflow_dispatch:
 
 jobs:
   k6_load_test:
@@ -20,7 +20,8 @@ jobs:
       mysql:
         image: mysql:8.0
         env:
-          MYSQL_ROOT_PASSWORD: AlphaPrime1.
+          # 🚨 Tells the MySQL container to allow a blank root password
+          MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
           MYSQL_DATABASE: arroyo_seco
         ports:
           - 3306:3306
@@ -39,7 +40,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y default-mysql-client
-          mysql -h 127.0.0.1 -u root -p'AlphaPrime1.' arroyo_seco < init_db.sql
+          # 🚨 Removed the -p flag entirely to connect with no password
+          mysql -h 127.0.0.1 -u root arroyo_seco < init_db.sql
 
       - name: Install Dependencies
         run: |
@@ -53,12 +55,19 @@ jobs:
 
       - name: Start Services
         run: |
-          # Wrap in parentheses to use subshells so the main script stays in the root directory
-          (cd auth-service && node server.js > ../auth.log 2>&1) &
-          (cd catalog-service && node server.js > ../catalog.log 2>&1) &
-          (cd order-service && node server.js > ../order.log 2>&1) &
-          (cd payment-service && node server.js > ../payment.log 2>&1) &
-          (cd reservation-service && node server.js > ../reservation.log 2>&1) &
+          # 🚨 Injecting your exact production variables (Blank Password)
+          export PORT=5002 # Setting specifically for catalog
+          export DB_HOST=127.0.0.1
+          export DB_USER=root
+          export DB_PASSWORD=''
+          export DB_NAME=arroyo_seco
+          export JWT_SECRET=123
+
+          (cd auth-service && DB_HOST=$DB_HOST DB_USER=$DB_USER DB_PASSWORD=$DB_PASSWORD DB_NAME=$DB_NAME JWT_SECRET=$JWT_SECRET node server.js > ../auth.log 2>&1) &
+          (cd catalog-service && PORT=5002 DB_HOST=$DB_HOST DB_USER=$DB_USER DB_PASSWORD=$DB_PASSWORD DB_NAME=$DB_NAME JWT_SECRET=$JWT_SECRET node server.js > ../catalog.log 2>&1) &
+          (cd order-service && DB_HOST=$DB_HOST DB_USER=$DB_USER DB_PASSWORD=$DB_PASSWORD DB_NAME=$DB_NAME JWT_SECRET=$JWT_SECRET node server.js > ../order.log 2>&1) &
+          (cd payment-service && DB_HOST=$DB_HOST DB_USER=$DB_USER DB_PASSWORD=$DB_PASSWORD DB_NAME=$DB_NAME JWT_SECRET=$JWT_SECRET node server.js > ../payment.log 2>&1) &
+          (cd reservation-service && DB_HOST=$DB_HOST DB_USER=$DB_USER DB_PASSWORD=$DB_PASSWORD DB_NAME=$DB_NAME JWT_SECRET=$JWT_SECRET node server.js > ../reservation.log 2>&1) &
           
           sleep 10
           
@@ -66,15 +75,20 @@ jobs:
           
           sleep 15 
           
-          # Strictly check if the gateway is up. We are still in the root dir, so logs are right here.
           if ! curl -f http://localhost:5000/health; then
-            echo "❌ API Gateway failed to start! Printing logs:"
-            echo "--- Gateway Logs ---"
-            cat gateway.log || echo "gateway.log not found"
-            echo "--- Auth Logs ---"
-            cat auth.log || echo "auth.log not found"
+            echo "❌ API Gateway failed to start!"
             exit 1 
           fi
+
+          # 🚨 Temporarily changed this to print the Gateway logs if it 404s
+          echo "Testing /products endpoint..."
+          if ! curl -f http://localhost:5000/products; then
+            echo "❌ /products endpoint failed! Printing API Gateway logs:"
+            echo "--- Gateway Logs ---"
+            cat gateway.log
+            exit 1
+          fi
+
       - name: Setup K6
         uses: grafana/setup-k6-action@v1
 
@@ -85,5 +99,5 @@ jobs:
           flags: --out cloud
           token: ${{ secrets.K6_CLOUD_TOKEN }}
         env:
-          K6_PROJECT_ID: ${{ secrets.K6_PROJECT_ID }} # Optional: If you prefer to pass it as env var instead of hardcoding in script
+          K6_PROJECT_ID: ${{ secrets.K6_PROJECT_ID }}
           API_URL: http://172.17.0.1:5000
