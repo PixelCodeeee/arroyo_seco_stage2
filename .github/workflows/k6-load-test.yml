@@ -75,6 +75,15 @@ jobs:
             echo "❌ API Gateway failed to start!"
             exit 1 
           fi
+
+          # 2. Check if the products endpoint works, print logs if it crashes!
+          echo "Testing /products endpoint..."
+          if ! curl -f http://localhost:5000/products; then
+            echo "❌ /products endpoint failed! Printing catalog service logs:"
+            echo "--- Catalog Logs ---"
+            cat catalog.log
+            exit 1
+          fi
       - name: Setup K6
         uses: grafana/setup-k6-action@v1
 
