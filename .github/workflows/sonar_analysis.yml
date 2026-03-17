@@ -13,7 +13,7 @@ on:
 jobs:
   sonarQube-analysis:
     name: Análisis de Calidad de Código
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     
     steps:
       - name: Clonación del repositorio (Checkout)
