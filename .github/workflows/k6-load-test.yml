@@ -53,17 +53,18 @@ jobs:
 
       - name: Start Services
         run: |
-          # Injecting DB environment variables so the services can connect
+          # Injecting exact DB environment variables from your .env
           export DB_HOST=127.0.0.1
           export DB_USER=root
-          export DB_PASS='AlphaPrime1.'
+          export DB_PASSWORD='AlphaPrime1.'
           export DB_NAME=arroyo_seco
+          export JWT_SECRET=123
 
-          (cd auth-service && DB_HOST=$DB_HOST DB_USER=$DB_USER DB_PASS=$DB_PASS DB_NAME=$DB_NAME node server.js > ../auth.log 2>&1) &
-          (cd catalog-service && DB_HOST=$DB_HOST DB_USER=$DB_USER DB_PASS=$DB_PASS DB_NAME=$DB_NAME node server.js > ../catalog.log 2>&1) &
-          (cd order-service && DB_HOST=$DB_HOST DB_USER=$DB_USER DB_PASS=$DB_PASS DB_NAME=$DB_NAME node server.js > ../order.log 2>&1) &
-          (cd payment-service && DB_HOST=$DB_HOST DB_USER=$DB_USER DB_PASS=$DB_PASS DB_NAME=$DB_NAME node server.js > ../payment.log 2>&1) &
-          (cd reservation-service && DB_HOST=$DB_HOST DB_USER=$DB_USER DB_PASS=$DB_PASS DB_NAME=$DB_NAME node server.js > ../reservation.log 2>&1) &
+          (cd auth-service && DB_HOST=$DB_HOST DB_USER=$DB_USER DB_PASSWORD=$DB_PASSWORD DB_NAME=$DB_NAME JWT_SECRET=$JWT_SECRET node server.js > ../auth.log 2>&1) &
+          (cd catalog-service && DB_HOST=$DB_HOST DB_USER=$DB_USER DB_PASSWORD=$DB_PASSWORD DB_NAME=$DB_NAME JWT_SECRET=$JWT_SECRET node server.js > ../catalog.log 2>&1) &
+          (cd order-service && DB_HOST=$DB_HOST DB_USER=$DB_USER DB_PASSWORD=$DB_PASSWORD DB_NAME=$DB_NAME JWT_SECRET=$JWT_SECRET node server.js > ../order.log 2>&1) &
+          (cd payment-service && DB_HOST=$DB_HOST DB_USER=$DB_USER DB_PASSWORD=$DB_PASSWORD DB_NAME=$DB_NAME JWT_SECRET=$JWT_SECRET node server.js > ../payment.log 2>&1) &
+          (cd reservation-service && DB_HOST=$DB_HOST DB_USER=$DB_USER DB_PASSWORD=$DB_PASSWORD DB_NAME=$DB_NAME JWT_SECRET=$JWT_SECRET node server.js > ../reservation.log 2>&1) &
           
           sleep 10
           
