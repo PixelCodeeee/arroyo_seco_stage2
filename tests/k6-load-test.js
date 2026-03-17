@@ -33,7 +33,7 @@ export default function () {
     sleep(1);
 
     // 2. Fetch Products Catalog Endpoint
-    const productsRes = http.get(`${BASE_URL}/api/productos`);
+    const res = http.get(`${BASE_URL}/api/productos`);
     check(productsRes, {
         'products is status 200': (r) => r.status === 200,
         'products return array': (r) => Array.isArray(r.json()),
