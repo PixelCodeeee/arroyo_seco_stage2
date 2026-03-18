@@ -2,22 +2,28 @@
 
 # Start all microservices
 echo "Starting Auth Service..."
-cd microservices/auth-service && npm start &
+cd auth-service && npm start &
+#cd microservices/auth-service && npm start &
 
 echo "Starting Catalog Service..."
-cd microservices/catalog-service && npm start &
+cd catalog-service && npm start &
+#cd microservices/catalog-service && npm start &
 
 echo "Starting Order Service..."
-cd microservices/order-service && npm start &
+cd order-service && npm start &
+#cd microservices/order-service && npm start &
 
 echo "Starting Reservation Service..."
-cd microservices/reservation-service && npm start &
+cd reservation-service && npm start &
+#cd microservices/reservation-service && npm start &
 
 echo "Starting Payment Service..."
-cd microservices/payment-service && npm start &
+cd payment-service && npm start &
+#cd microservices/payment-service && npm start &
 
 echo "Starting API Gateway..."
-cd microservices/api-gateway && npm start &
+cd api-gateway && npm start &
+#cd microservices/api-gateway && npm start &
 
 echo "All services started!"
 wait
