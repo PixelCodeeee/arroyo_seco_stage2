@@ -16,63 +16,22 @@ jobs:
     uses: ./.github/workflows/k6-load-test.yml
     secrets: inherit
 
-  build-and-push:
+  local-deploy:
     needs: [sonarQube, k6-test]
     runs-on: self-hosted
-    strategy:
-      matrix:
-        service: 
-          - api-gateway
-          - auth-service
-          - catalog-service
-          - order-service
-          - payment-service
-          - reservation-service
-          - announcements-service
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-      
-      - name: Log in to the Container registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+      # We do not even need checkout here because we will deploy from your live folder!
+      - name: Build and Deploy Local Microservices
+        run: |
+          # Go to the live production directory on the VM
+          cd /home/joshualuna/arroyo_seco_stage2
           
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ghcr.io/${{ github.repository }}/${{ matrix.service }}
+          # Pull the latest code that triggered this pipeline
+          git pull origin main
           
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: ${{ matrix.service }}
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-
-  deploy:
-    needs: build-and-push
-    runs-on: self-hosted
-    steps:
-      - name: Deploy to Cloud VM via SSH
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: 10.0.1.4
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          script: |
-            # Update this path if the microservices folder is located elsewhere
-            cd ~/arroyo_seco_backend-master/microservices || cd ~/microservices
-            
-            # Login to GHCR to be able to pull packages if they are private
-            echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-            
-            # Pull the latest versions
-            docker-compose pull
-            
-            # Re-create and restart containers with new images
-            docker-compose up -d --remove-orphans
+          # Build the images using the live docker-compose file
+          docker-compose build
+          
+          # Restart the containers (since the directory name is arroyo_seco_stage2, 
+          # it will correctly target your existing containers!)
+          docker-compose up -d --remove-orphans
