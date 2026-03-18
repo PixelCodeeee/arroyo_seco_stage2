@@ -30,8 +30,8 @@ jobs:
           git pull origin main
           
           # Build the images using the live docker-compose file
-          docker-compose build
+          docker compose build
           
           # Restart the containers (since the directory name is arroyo_seco_stage2, 
           # it will correctly target your existing containers!)
-          docker-compose up -d --remove-orphans
+          docker compose up -d --remove-orphans
