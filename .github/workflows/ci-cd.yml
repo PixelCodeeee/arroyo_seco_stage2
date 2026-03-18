@@ -1,0 +1,78 @@
+name: CI/CD Microservices Deploy
+
+on:
+  push:
+    branches:
+      - master
+      - main
+  workflow_dispatch:
+
+jobs:
+  sonarQube:
+    uses: ./.github/workflows/sonar_analysis.yml
+    secrets: inherit
+
+  k6-test:
+    uses: ./.github/workflows/k6-load-test.yml
+    secrets: inherit
+
+  build-and-push:
+    needs: [sonarQube, k6-test]
+    runs-on: self-hosted
+    strategy:
+      matrix:
+        service: 
+          - api-gateway
+          - auth-service
+          - catalog-service
+          - order-service
+          - payment-service
+          - reservation-service
+          - announcements-service
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/${{ matrix.service }}
+          
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./microservices/${{ matrix.service }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  deploy:
+    needs: build-and-push
+    runs-on: self-hosted
+    steps:
+      - name: Deploy to Cloud VM via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: 10.0.1.4
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            # Update this path if the microservices folder is located elsewhere
+            cd ~/arroyo_seco_backend-master/microservices || cd ~/microservices
+            
+            # Login to GHCR to be able to pull packages if they are private
+            echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            
+            # Pull the latest versions
+            docker-compose pull
+            
+            # Re-create and restart containers with new images
+            docker-compose up -d --remove-orphans
