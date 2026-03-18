@@ -1,0 +1,86 @@
+-- --------------------------------------------------------
+---- --------------------------------------------------------
+--
+-- Tablas para el sistema de reviews
+-- Ejecutar en la base de datos arroyo_seco
+--
+-- --------------------------------------------------------
+
+USE arroyo_seco;
+
+-- --------------------------------------------------------
+-- Tabla: review
+-- --------------------------------------------------------
+CREATE TABLE review (
+    id_review INT AUTO_INCREMENT PRIMARY KEY,
+    id_usuario INT NOT NULL,
+    id_oferente INT NOT NULL,
+
+    rating TINYINT NOT NULL CHECK (rating BETWEEN 1 AND 5),
+    comentario TEXT,
+
+    status_review ENUM('publicada','oculta','eliminada') DEFAULT 'publicada',
+
+    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario),
+    FOREIGN KEY (id_oferente) REFERENCES oferente(id_oferente)
+);
+
+-- --------------------------------------------------------
+-- Tabla: review_response
+-- --------------------------------------------------------
+CREATE TABLE review_response (
+    id_review_response INT AUTO_INCREMENT PRIMARY KEY,
+    id_review INT NOT NULL,
+    id_oferente INT NOT NULL,
+    mensaje TEXT NOT NULL,
+    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (id_review) REFERENCES review(id_review),
+    FOREIGN KEY (id_oferente) REFERENCES oferente(id_oferente)
+);
+
+-- --------------------------------------------------------
+-- Tabla: review_report
+-- --------------------------------------------------------
+CREATE TABLE review_report (
+    id_review_report INT AUTO_INCREMENT PRIMARY KEY,
+    id_review INT NOT NULL,
+    id_usuario_reporta INT NOT NULL,
+
+    motivo ENUM(
+        'ofensivo',
+        'spam',
+        'falso',
+        'otro'
+    ) NOT NULL,
+
+    estado_reporte ENUM(
+        'pendiente',
+        'resuelto'
+    ) DEFAULT 'pendiente',
+
+    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (id_review) REFERENCES review(id_review),
+    FOREIGN KEY (id_usuario_reporta) REFERENCES usuario(id_usuario)
+);
+
+-- --------------------------------------------------------
+-- Vista: view_reviews_with_responses
+-- --------------------------------------------------------
+CREATE VIEW view_reviews_with_responses AS
+SELECT 
+    r.*,
+    u.nombre AS usuario_nombre,
+    u.correo AS usuario_correo,
+    rr.id_review_response,
+    rr.mensaje AS respuesta_mensaje,
+    rr.fecha_creacion AS respuesta_fecha,
+    o.nombre_negocio AS oferente_nombre
+FROM review r
+LEFT JOIN usuario u ON r.id_usuario = u.id_usuario
+LEFT JOIN review_response rr ON r.id_review = rr.id_review
+LEFT JOIN oferente o ON rr.id_oferente = o.id_oferente;

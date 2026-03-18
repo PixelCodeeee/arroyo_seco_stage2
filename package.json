@@ -1,0 +1,19 @@
+{
+  "name": "arroyo_seco_stage2-main",
+  "version": "1.0.0",
+  "description": "This is a github actions test:",
+  "main": "index.js",
+"scripts": {
+  "start-all": "concurrently --kill-others \"cd auth-service && npm start\" \"cd catalog-service && npm start\" \"cd order-service && npm start\" \"cd payment-service && npm start\" \"cd reservation-service && npm start\" \"cd review-service && npm start\" \"cd api-gateway && npm start\""
+},
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "http-proxy-middleware": "^3.0.5"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}
