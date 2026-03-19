@@ -23,6 +23,11 @@ app.get('/health', (req, res) => {
     res.json({ status: 'OK', service: 'API Gateway' });
 });
 
+// Catch-all for stubborn GCP Health Checks
+app.get('/api/', (req, res) => {
+    res.status(200).send('GCP Health Check OK');
+});
+
 // Service URLs
 const AUTH_SERVICE = process.env.AUTH_SERVICE_URL || 'http://localhost:5001';
 const CATALOG_SERVICE = process.env.CATALOG_SERVICE_URL || 'http://localhost:5002';
