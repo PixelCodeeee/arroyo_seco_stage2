@@ -1,20 +1,7 @@
 version: '3.8'
 
 services:
-  # 1. The Database
-  mysql-db:
-    image: mysql:8.0
-    restart: always
-    environment:
-      MYSQL_ROOT_PASSWORD: root_password_123
-      MYSQL_DATABASE: arroyo_seco
-      MYSQL_USER: db_user
-      MYSQL_PASSWORD: arroyo_password
-    volumes:
-      - ./init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
-      - mysql_data:/var/lib/mysql
-
-  # 2. Your API Gateway
+  # 1. Your API Gateway
   api-gateway:
     build: ./api-gateway
     restart: always
@@ -35,14 +22,12 @@ services:
       - PAYMENT_SERVICE_URL=http://payment-service:5005
       - ANNOUNCEMENTS_SERVICE_URL=http://announcements-service:5006
 
-  # 3. Your Internal Microservices
+  # 2. Your Internal Microservices
   auth-service:
     build: ./auth-service
     restart: always
-    depends_on:
-      - mysql-db
     environment:
-      - DB_HOST=mysql-db
+      - DB_HOST=10.223.32.3 # Cloud SQL Private IP
       - DB_USER=db_user
       - DB_PASSWORD=arroyo_password
       - DB_NAME=arroyo_seco
@@ -52,10 +37,8 @@ services:
   catalog-service:
     build: ./catalog-service
     restart: always
-    depends_on:
-      - mysql-db
     environment:
-      - DB_HOST=mysql-db
+      - DB_HOST=10.223.32.3 # Cloud SQL Private IP
       - DB_USER=db_user
       - DB_PASSWORD=arroyo_password
       - DB_NAME=arroyo_seco
@@ -64,10 +47,8 @@ services:
   order-service:
     build: ./order-service
     restart: always
-    depends_on:
-      - mysql-db
     environment:
-      - DB_HOST=mysql-db
+      - DB_HOST=10.223.32.3 # Cloud SQL Private IP
       - DB_USER=db_user
       - DB_PASSWORD=arroyo_password
       - DB_NAME=arroyo_seco
@@ -76,10 +57,8 @@ services:
   reservation-service:
     build: ./reservation-service
     restart: always
-    depends_on:
-      - mysql-db
     environment:
-      - DB_HOST=mysql-db
+      - DB_HOST=10.223.32.3 # Cloud SQL Private IP
       - DB_USER=db_user
       - DB_PASSWORD=arroyo_password
       - DB_NAME=arroyo_seco
@@ -88,10 +67,8 @@ services:
   payment-service:
     build: ./payment-service
     restart: always
-    depends_on:
-      - mysql-db
     environment:
-      - DB_HOST=mysql-db
+      - DB_HOST=10.223.32.3 # Cloud SQL Private IP
       - DB_USER=db_user
       - DB_PASSWORD=arroyo_password
       - DB_NAME=arroyo_seco
@@ -100,10 +77,8 @@ services:
   announcements-service:
     build: ./announcements-service
     restart: always
-    depends_on:
-      - mysql-db
     environment:
-      - DB_HOST=mysql-db
+      - DB_HOST=10.223.32.3 # Cloud SQL Private IP
       - DB_USER=db_user
       - DB_PASSWORD=arroyo_password
       - DB_NAME=arroyo_seco
