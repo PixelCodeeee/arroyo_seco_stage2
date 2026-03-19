@@ -1,12 +1,12 @@
 version: '3.8'
 
 services:
-  # 1. Your API Gateway
+  # 1.  API Gateway
   api-gateway:
     build: ./api-gateway
     restart: always
     ports:
-      - "80:5000"
+      - "5000:5000"
     depends_on:
       - auth-service
       - catalog-service
@@ -22,7 +22,7 @@ services:
       - PAYMENT_SERVICE_URL=http://payment-service:5005
       - ANNOUNCEMENTS_SERVICE_URL=http://announcements-service:5006
 
-  # 2. Your Internal Microservices
+  # 2.  Internal Microservices
   auth-service:
     build: ./auth-service
     restart: always
