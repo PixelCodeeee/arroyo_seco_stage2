@@ -32,7 +32,7 @@ services:
       - DB_PASSWORD=arroyo_password
       - DB_NAME=arroyo_seco
       - PORT=5001
-      - JWT_SECRET=your_jwt_secret_key
+      - JWT_SECRET=AlphaPrime.2026
 
   catalog-service:
     build: ./catalog-service
@@ -43,6 +43,7 @@ services:
       - DB_PASSWORD=arroyo_password
       - DB_NAME=arroyo_seco
       - PORT=5002
+      - JWT_SECRET=AlphaPrime.2026
 
   order-service:
     build: ./order-service
@@ -53,6 +54,7 @@ services:
       - DB_PASSWORD=arroyo_password
       - DB_NAME=arroyo_seco
       - PORT=5003
+      - JWT_SECRET=AlphaPrime.2026
 
   reservation-service:
     build: ./reservation-service
@@ -63,6 +65,7 @@ services:
       - DB_PASSWORD=arroyo_password
       - DB_NAME=arroyo_seco
       - PORT=5004
+      - JWT_SECRET=AlphaPrime.2026
 
   payment-service:
     build: ./payment-service
@@ -73,6 +76,7 @@ services:
       - DB_PASSWORD=arroyo_password
       - DB_NAME=arroyo_seco
       - PORT=5005
+      - JWT_SECRET=AlphaPrime.2026
 
   announcements-service:
     build: ./announcements-service
@@ -83,6 +87,7 @@ services:
       - DB_PASSWORD=arroyo_password
       - DB_NAME=arroyo_seco
       - PORT=5006
+      - JWT_SECRET=AlphaPrime.2026
 
 volumes:
   mysql_data:
