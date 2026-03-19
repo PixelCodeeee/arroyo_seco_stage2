@@ -23,7 +23,7 @@ jobs:
   # --- 🏗️ PHASE 2: Canary Deployment ---
   deploy-to-canary:
     name: 🏗️ 1. Deploy to V2 (Canary VM)
-    needs: [sonarQube, k6-test] # <--- MAGIC: Canary waits for tests to pass!
+    needs: [sonarQube, k6-test] 
     runs-on: self-hosted 
     steps:
       - name: Deploy via Internal Network
@@ -32,6 +32,7 @@ jobs:
           host: ${{ secrets.CANARY_VM_IP }} 
           username: joshualuna
           key: ${{ secrets.VM_SSH_KEY }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE }}
           script: |
             cd arroyo_seco_stage2
             git pull origin main
