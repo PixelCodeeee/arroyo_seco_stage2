@@ -172,6 +172,54 @@ const reportController = {
             console.error('Error ocultando review:', error);
             res.status(500).json({ error: error.message });
         }
+    },
+
+    // Obtener reportes pendientes (admin)
+    async getPendingReports(req, res) {  // ✅ Corregido: definición correcta de método
+        try {
+            const { page = 1, limit = 20 } = req.query;
+            
+            const [reports] = await promisePool.execute(
+                `SELECT 
+                    rr.id_review_report,
+                    rr.motivo,
+                    rr.fecha_creacion,
+                    rr.estado_reporte,
+                    r.id_review,
+                    r.rating,
+                    r.comentario AS review_comentario,
+                    u_autor.nombre AS autor_nombre,
+                    o.nombre_negocio,
+                    u_reportero.nombre AS reportero_nombre,
+                    u_reportero.rol AS reportero_rol
+                FROM review_report rr
+                INNER JOIN review r ON rr.id_review = r.id_review
+                INNER JOIN usuario u_autor ON r.id_usuario = u_autor.id_usuario
+                LEFT JOIN oferente o ON r.id_oferente = o.id_oferente
+                INNER JOIN usuario u_reportero ON rr.id_usuario_reporta = u_reportero.id_usuario
+                WHERE rr.estado_reporte = 'pendiente'
+                ORDER BY rr.fecha_creacion ASC
+                LIMIT ? OFFSET ?`,
+                [parseInt(limit), (parseInt(page) - 1) * parseInt(limit)]
+            );
+            
+            const [[{ total }]] = await promisePool.execute(
+                'SELECT COUNT(*) as total FROM review_report WHERE estado_reporte = "pendiente"'
+            );
+            
+            res.json({
+                data: reports,
+                pagination: {
+                    page: parseInt(page),
+                    limit: parseInt(limit),
+                    total,
+                    totalPages: Math.ceil(total / limit)
+                }
+            });
+        } catch (error) {
+            console.error('Error getting pending reports:', error);
+            res.status(500).json({ error: error.message });
+        }
     }
 };
 

@@ -8,7 +8,7 @@ const reviewController = {
     async createReview(req, res) {
         try {
             const userId = req.usuario.id;
-            const { id_oferente, rating, comentario } = req.body;
+            const { id_oferente, rating, titulo, comentario } = req.body;
 
             console.log('Creando review - Body:', req.body);
             console.log('Usuario ID:', userId);
@@ -37,12 +37,13 @@ const reviewController = {
 
             // Crear review
             const newReview = await Review.create({
-                id_usuario: userId,
-                id_oferente,
-                rating,
-                comentario,
-                status_review: 'publicada'
-            });
+    id_usuario: req.usuario.id,
+    id_oferente,
+    rating,
+    titulo,
+    comentario,
+    status_review: 'publicada'
+});
 
             console.log('Review creada con ID:', newReview.id_review);
 

@@ -26,7 +26,7 @@ const CATALOG_SERVICE = process.env.CATALOG_SERVICE_URL || 'http://localhost:500
 const ORDER_SERVICE = process.env.ORDER_SERVICE_URL || 'http://localhost:5003';
 const RESERVATION_SERVICE = process.env.RESERVATION_SERVICE_URL || 'http://localhost:5004';
 const PAYMENT_SERVICE = process.env.PAYMENT_SERVICE_URL || 'http://localhost:5005';
-const REVIEW_SERVICE = process.env.REVIEW_SERVICE_URL || 'http://localhost:5006';
+const REVIEW_SERVICE = process.env.REVIEW_SERVICE_URL || 'http://localhost:5007';
 
 // Proxy rules
 app.use('/api/usuarios', proxy(AUTH_SERVICE, {
@@ -63,11 +63,21 @@ app.use('/api/oferentes', proxy(CATALOG_SERVICE, {
     proxyReqPathResolver: (req) => {
         return `/api/oferentes${req.url}`;
     },
-    proxyReqOptDecorator: (proxyReqOpts, srcReq) => {
+    proxyReqOptDecorator: (proxyReqOpts) => {
         proxyReqOpts.headers['Content-Type'] = 'application/json';
         return proxyReqOpts;
     }
 }));
+/*
+app.use('/port: process.env.DB_PORT || 3307,', proxy(CATALOG_SERVICE, {
+    proxyReqPathResolver: (req) => {
+        return `/port: process.env.DB_PORT || 3307,${req.url}`;
+    },
+    proxyReqOptDecorator: (proxyReqOpts, srcReq) => {
+        proxyReqOpts.headers['Content-Type'] = 'application/json';
+        return proxyReqOpts;
+    }
+}));*/
 
 app.use('/api/servicios', proxy(CATALOG_SERVICE, {
     proxyReqPathResolver: (req) => {

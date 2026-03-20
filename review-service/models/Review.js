@@ -3,40 +3,35 @@ const promisePool = require('../config/db');
 const db = promisePool;
 
 class Review {
-    // Crear nueva reseña
-static async create(data) {
-    const { 
-        id_usuario, id_oferente, id_producto, id_servicio,
-        id_pedido, id_reserva, compra_verificada, rating, 
-        titulo, comentario, status_review = 'publicada' 
-    } = data;
+    // Crear nueva review
+    static async create(data) {
+        try {
+            const { 
+                id_usuario, 
+                id_oferente, 
+                rating, 
+                titulo = null, 
+                comentario = null, 
+                status_review = 'publicada' 
+            } = data;
 
-    // Convertir undefined a null
-    const safeValues = [
-        id_usuario ?? null,
-        id_oferente ?? null,
-        id_producto ?? null,
-        id_servicio ?? null,
-        id_pedido ?? null,
-        id_reserva ?? null,
-        compra_verificada ?? false,
-        rating ?? null,
-        titulo ?? null,
-        comentario ?? null,
-        status_review ?? 'publicada'
-    ];
+            console.log('Insertando review con valores:', [id_usuario, id_oferente, rating, titulo, comentario, status_review]);
 
-    console.log('Insertando review con valores:', safeValues);
+            const [result] = await promisePool.execute(
+                `INSERT INTO review 
+                    (id_usuario, id_oferente, rating, titulo, comentario, status_review) 
+                 VALUES (?, ?, ?, ?, ?, ?)`,
+                [id_usuario, id_oferente, rating, titulo, comentario, status_review]
+            );
 
-     const [result] = await promisePool.execute(
-            `INSERT INTO review 
-                (id_usuario, id_oferente, rating, comentario, status_review) 
-             VALUES (?, ?, ?, ?, ?)`,
-            [id_usuario, id_oferente, rating, comentario, status_review]
-        );
+            // Retornar la review recién creada
+            return this.findById(result.insertId);
 
-    return this.findById(result.insertId);
-}
+        } catch (err) {
+            console.error('Error al crear la review:', err);
+            throw new Error('Error al crear la review'); // deja que el controller maneje la respuesta
+        }
+    }
 
     // Obtener reseña por ID
     static async findById(id) {

@@ -13,7 +13,7 @@ const reportRoutes = require('./routes/reports');
 const userRoutes = require('./routes/users');
 
 const app = express();
-const PORT = process.env.PORT || 5006;
+const PORT = process.env.PORT || 5007;
 
 // Middleware de logging
 app.use((req, res, next) => {

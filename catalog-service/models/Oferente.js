@@ -4,6 +4,16 @@ const db = promisePool; // alias para mantener el resto del código igual
 
 console.log("DB catalog-service/models/Oferente.js:", db ? "Conectada" : "No conectada");
 
+// Función segura para parsear JSON
+function safeJSONParse(value) {
+    if (typeof value !== 'string') return value;
+    try {
+        return JSON.parse(value);
+    } catch {
+        return value; // si no es JSON válido, devuelve el texto tal cual
+    }
+}
+
 class Oferente {
 
     // Crear oferente
@@ -52,9 +62,7 @@ class Oferente {
 
             return oferentes.map(o => ({
                 ...o,
-                horario_disponibilidad: typeof o.horario_disponibilidad === 'string'
-                    ? JSON.parse(o.horario_disponibilidad)
-                    : o.horario_disponibilidad
+                horario_disponibilidad: safeJSONParse(o.horario_disponibilidad)
             }));
         } catch (error) {
             console.error('Error en findAll:', error);
@@ -103,9 +111,7 @@ class Oferente {
 
             return oferentes.map(o => ({
                 ...o,
-                horario_disponibilidad: typeof o.horario_disponibilidad === 'string'
-                    ? JSON.parse(o.horario_disponibilidad)
-                    : o.horario_disponibilidad
+                horario_disponibilidad: safeJSONParse(o.horario_disponibilidad)
             }));
         } catch (error) {
             console.error('Error en findAllWithFilters:', error);
@@ -137,15 +143,7 @@ class Oferente {
             if (rows.length === 0) return null;
 
             const oferente = rows[0];
-
-            if (oferente.horario_disponibilidad && typeof oferente.horario_disponibilidad === 'string') {
-                try {
-                    oferente.horario_disponibilidad = JSON.parse(oferente.horario_disponibilidad);
-                } catch (e) {
-                    console.error('Error parsing horario_disponibilidad:', e);
-                    oferente.horario_disponibilidad = null;
-                }
-            }
+            oferente.horario_disponibilidad = safeJSONParse(oferente.horario_disponibilidad);
 
             return oferente;
         } catch (error) {
@@ -175,15 +173,7 @@ class Oferente {
             if (rows.length === 0) return null;
 
             const oferente = rows[0];
-
-            if (oferente.horario_disponibilidad && typeof oferente.horario_disponibilidad === 'string') {
-                try {
-                    oferente.horario_disponibilidad = JSON.parse(oferente.horario_disponibilidad);
-                } catch (e) {
-                    console.error('Error parsing horario_disponibilidad:', e);
-                    oferente.horario_disponibilidad = null;
-                }
-            }
+            oferente.horario_disponibilidad = safeJSONParse(oferente.horario_disponibilidad);
 
             return oferente;
         } catch (error) {

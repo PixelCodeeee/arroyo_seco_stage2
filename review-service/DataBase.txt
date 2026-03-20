@@ -17,6 +17,7 @@ CREATE TABLE review (
     id_oferente INT NOT NULL,
 
     rating TINYINT NOT NULL CHECK (rating BETWEEN 1 AND 5),
+    titulo VARCHAR(255) NULL,
     comentario TEXT,
 
     status_review ENUM('publicada','oculta','eliminada') DEFAULT 'publicada',
@@ -53,8 +54,7 @@ CREATE TABLE review_report (
     motivo ENUM(
         'ofensivo',
         'spam',
-        'falso',
-        'otro'
+        'falso'
     ) NOT NULL,
 
     estado_reporte ENUM(
