@@ -1,25 +1,22 @@
-const paypal = require('@paypal/checkout-server-sdk');
+const axios = require('axios');
 
-/**
- * PRODUCTION Environment
- * Sandbox: https://api.sandbox.paypal.com
- * Production: https://api.paypal.com
- */
+const MP_CONFIG = {
+  accessToken:  process.env.MP_ACCESS_TOKEN,
+  publicKey:    process.env.MP_PUBLIC_KEY,
+  clientId:     process.env.MP_CLIENT_ID,
+  clientSecret: process.env.MP_CLIENT_SECRET,
+  redirectUri:  process.env.MP_REDIRECT_URI,
+  apiUrl:       process.env.MP_API_URL || 'https://api.mercadopago.com',
+  appUrl:       process.env.APP_URL || 'http://localhost:5005'
+};
 
-function environment() {
-    let clientId = process.env.PAYPAL_CLIENT_ID || 'ATeS2f9S9X9o_d8l8p3j0k4m5n6q7r8s9t0v1w2x3y4z5';
-    let clientSecret = process.env.PAYPAL_CLIENT_SECRET || 'EBo_...';
+// Cliente axios preconfigurado para MercadoPago
+const mpClient = axios.create({
+  baseURL: MP_CONFIG.apiUrl,
+  headers: {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${MP_CONFIG.accessToken}`
+  }
+});
 
-    // In production, use LiveEnvironment
-    if (process.env.NODE_ENV === 'production') {
-        return new paypal.core.LiveEnvironment(clientId, clientSecret);
-    }
-
-    return new paypal.core.SandboxEnvironment(clientId, clientSecret);
-}
-
-function client() {
-    return new paypal.core.PayPalHttpClient(environment());
-}
-
-module.exports = { client };
+module.exports = { MP_CONFIG, mpClient };

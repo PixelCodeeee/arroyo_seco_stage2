@@ -1,6 +1,7 @@
 const mysql = require('mysql2');
 
 // Database configuration
+console.log("DEBUG: El host que estoy leyendo es:", process.env.DB_HOST);
 const dbConfig = {
     host: process.env.DB_HOST || 'localhost',
     port: process.env.DB_PORT || 3306,
@@ -29,3 +30,5 @@ pool.getConnection((err, connection) => {
 });
 
 module.exports = promisePool;
+
+
