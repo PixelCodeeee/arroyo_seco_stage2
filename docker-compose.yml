@@ -1,0 +1,93 @@
+version: '3.8'
+
+services:
+  # 1.  API Gateway
+  api-gateway:
+    build: ./api-gateway
+    restart: always
+    ports:
+      - "5000:5000"
+    depends_on:
+      - auth-service
+      - catalog-service
+      - order-service
+      - reservation-service
+      - payment-service
+      - announcements-service
+    environment:
+      - AUTH_SERVICE_URL=http://auth-service:5001
+      - CATALOG_SERVICE_URL=http://catalog-service:5002
+      - ORDER_SERVICE_URL=http://order-service:5003
+      - RESERVATION_SERVICE_URL=http://reservation-service:5004
+      - PAYMENT_SERVICE_URL=http://payment-service:5005
+      - ANNOUNCEMENTS_SERVICE_URL=http://announcements-service:5006
+
+  # 2.  Internal Microservices
+  auth-service:
+    build: ./auth-service
+    restart: always
+    environment:
+      - DB_HOST=10.223.32.3 # Cloud SQL Private IP
+      - DB_USER=db_user
+      - DB_PASSWORD=arroyo_password
+      - DB_NAME=arroyo_seco
+      - PORT=5001
+      - JWT_SECRET=AlphaPrime.2026
+
+  catalog-service:
+    build: ./catalog-service
+    restart: always
+    environment:
+      - DB_HOST=10.223.32.3 # Cloud SQL Private IP
+      - DB_USER=db_user
+      - DB_PASSWORD=arroyo_password
+      - DB_NAME=arroyo_seco
+      - PORT=5002
+      - JWT_SECRET=AlphaPrime.2026
+
+  order-service:
+    build: ./order-service
+    restart: always
+    environment:
+      - DB_HOST=10.223.32.3 # Cloud SQL Private IP
+      - DB_USER=db_user
+      - DB_PASSWORD=arroyo_password
+      - DB_NAME=arroyo_seco
+      - PORT=5003
+      - JWT_SECRET=AlphaPrime.2026
+
+  reservation-service:
+    build: ./reservation-service
+    restart: always
+    environment:
+      - DB_HOST=10.223.32.3 # Cloud SQL Private IP
+      - DB_USER=db_user
+      - DB_PASSWORD=arroyo_password
+      - DB_NAME=arroyo_seco
+      - PORT=5004
+      - JWT_SECRET=AlphaPrime.2026
+
+  payment-service:
+    build: ./payment-service
+    restart: always
+    environment:
+      - DB_HOST=10.223.32.3 # Cloud SQL Private IP
+      - DB_USER=db_user
+      - DB_PASSWORD=arroyo_password
+      - DB_NAME=arroyo_seco
+      - PORT=5005
+      - JWT_SECRET=AlphaPrime.2026
+
+  announcements-service:
+    build: ./announcements-service
+    restart: always
+    environment:
+      - DB_HOST=10.223.32.3 # Cloud SQL Private IP
+      - DB_USER=db_user
+      - DB_PASSWORD=arroyo_password
+      - DB_NAME=arroyo_seco
+      - PORT=5006
+      - JWT_SECRET=AlphaPrime.2026
+
+volumes:
+  mysql_data:

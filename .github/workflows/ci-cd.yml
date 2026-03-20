@@ -1,0 +1,92 @@
+name: Arroyo Seco Canary Deployment
+
+on:
+  push:
+    branches:
+      - master
+      - main
+  workflow_dispatch: # Allows you to trigger this manually from GitHub!
+
+env:
+  URL_MAP_NAME: arroyo-seco-canary-lb
+
+jobs:
+  # --- 🛡️ PHASE 1: Quality & Performance Gates ---
+  sonarQube:
+    uses: ./.github/workflows/sonar_analysis.yml
+    secrets: inherit
+
+  k6-test:
+    uses: ./.github/workflows/k6-load-test.yml
+    secrets: inherit
+
+  # --- 🏗️ PHASE 2: Canary Deployment ---
+  deploy-to-canary:
+    name: 🏗️ 1. Deploy to V2 (Canary VM)
+    needs: [sonarQube, k6-test] 
+    runs-on: self-hosted 
+    steps:
+      - name: Deploy via Internal Network
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.CANARY_VM_IP }} 
+          username: joshualuna
+          key: ${{ secrets.VM_SSH_KEY }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE }}
+          script: |
+            cd arroyo_seco_stage2
+            git pull origin main
+            docker compose build
+            docker compose up -d --remove-orphans
+
+  # --- 🚦 PHASE 3: Traffic Routing ---
+  shift-10-percent:
+    name: 🚦 2. Route 10% Traffic
+    needs: deploy-to-canary
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
+          
+      - name: Apply 90/10 URL Map
+        run: |
+          gcloud compute url-maps import ${{ env.URL_MAP_NAME }} \
+            --source=.gcp/routing-90-10.yaml \
+            --global \
+            --quiet
+
+  # --- 🚀 PHASE 4: Production Promotion ---
+  promote-code-to-v1:
+    name: 🚀 3. Update Stable VM (V1)
+    needs: shift-10-percent
+    runs-on: self-hosted
+    environment: production-approval # Pauses here so the team can review logs
+    steps:
+      - name: Deploy Locally to Stable VM
+        run: |
+          cd /home/joshualuna/arroyo_seco_stage2
+          git pull origin main
+          docker compose build
+          docker compose up -d --remove-orphans
+
+  # --- 🏁 PHASE 5: Traffic Restoration ---
+  restore-traffic-to-v1:
+    name: 🏁 4. Restore 100% Traffic to V1
+    needs: promote-code-to-v1
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
+
+      - name: Apply 100/0 URL Map
+        run: |
+          gcloud compute url-maps import ${{ env.URL_MAP_NAME }} \
+            --source=.gcp/routing-100-0.yaml \
+            --global \
+            --quiet

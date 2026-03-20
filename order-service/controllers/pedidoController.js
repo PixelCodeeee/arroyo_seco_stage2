@@ -234,3 +234,29 @@ exports.eliminarPedido = async (req, res) => {
         res.status(500).json({ error: 'Error al eliminar pedido' });
     }
 };
+
+// Top productos más vendidos (recomendaciones)
+exports.getTopProductos = async (req, res) => {
+    try {
+        const limit = parseInt(req.query.limit) || 10;
+        const productos = await Pedido.getTopProductos(limit);
+        res.json({
+            total: productos.length,
+            productos
+        });
+    } catch (error) {
+        console.error('Error fetching top productos:', error);
+        res.status(500).json({ error: 'Error al obtener top productos' });
+    }
+};
+
+// Stats para analíticas (solo admin)
+exports.getStatsAnaliticas = async (req, res) => {
+    try {
+        const stats = await Pedido.getStatsAnaliticas();
+        res.json(stats);
+    } catch (error) {
+        console.error('Error fetching stats analiticas:', error);
+        res.status(500).json({ error: 'Error al obtener estadísticas' });
+    }
+};

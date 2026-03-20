@@ -1,0 +1,33 @@
+name: CI Pipeline - Análisis SAST con SonarQube
+
+on:
+  push:
+    branches:
+      - master
+      - main
+  pull_request:
+    branches:
+      - master
+      - main
+  workflow_call:
+
+jobs:
+  sonarQube-analysis:
+    name: Análisis de Calidad de Código
+    runs-on: self-hosted
+    
+    steps:
+      - name: Clonación del repositorio (Checkout)
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Requerido por SonarQube para un análisis histórico completo
+
+      - name: Ejecución de Escáner SonarQube
+        uses: SonarSource/sonarqube-scan-action@master
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        with:
+          args: >
+            -Dsonar.projectKey=arroyo-seco-backend
+            -Dsonar.qualitygate.wait=true

@@ -280,3 +280,15 @@ exports.eliminarUsuario = async (req, res) => {
         res.status(500).json({ error: 'Error al eliminar usuario' });
     }
 };
+
+// Stats para analíticas (solo admin)
+exports.getStats = async (req, res) => {
+    try {
+        const stats = await Usuario.getStats();
+        const registrosPorMes = await Usuario.getRegistrosPorMes();
+        res.json({ stats, registrosPorMes });
+    } catch (error) {
+        console.error('Error fetching user stats:', error);
+        res.status(500).json({ error: 'Error al obtener estadísticas' });
+    }
+};

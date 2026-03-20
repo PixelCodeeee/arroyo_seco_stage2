@@ -81,5 +81,7 @@ Si cualquier step falla, el pipeline se detiene, notifica al desarrollador y act
 3. Ejecuta el script de inicio:
 
     ```bash
-    ./start-all.sh
+    ./start-all.sh (linux/mac)
+    ./start-all.ps1 (windows powershell)
+    ./start-all.bat (windows cmd)
     ```
