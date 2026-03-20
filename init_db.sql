@@ -122,5 +122,15 @@ CREATE TABLE IF NOT EXISTS reserva (
     FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario) ON DELETE CASCADE,
     FOREIGN KEY (id_servicio) REFERENCES servicio_restaurante(id_servicio) ON DELETE CASCADE
 );
+-- 11. Announcements (No dependencies)
+CREATE TABLE IF NOT EXISTS announcements (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    description TEXT NOT NULL,
+    image_url VARCHAR(500) DEFAULT NULL,
+    event_date DATE DEFAULT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    is_active TINYINT(1) DEFAULT 1
+);
 
 SELECT 'Database initialization completed successfully.' as status;
