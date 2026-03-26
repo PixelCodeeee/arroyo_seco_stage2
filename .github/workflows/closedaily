@@ -1,7 +1,5 @@
 name: Close Daily Standup
 
-# 00:00 UTC corresponds to 06:00 PM (18:00) CST in Querétaro the previous day.
-# To trigger at 6 PM Mon-Fri locally, we run it at Midnight Tue-Sat in UTC.
 on:
   workflow_dispatch: # Allows you to manually trigger the close action for testing!
   schedule:

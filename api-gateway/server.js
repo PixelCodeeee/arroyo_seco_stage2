@@ -6,6 +6,22 @@ const proxy = require('express-http-proxy');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// --- PROMETHEUS SETUP ---
+// Enable default metrics collection (CPU, Memory, Event Loop)
+const collectDefaultMetrics = promClient.collectDefaultMetrics;
+collectDefaultMetrics({ prefix: 'arroyo_gateway_' });
+
+// Expose the /metrics endpoint for Prometheus to scrape
+app.get('/metrics', async (req, res) => {
+    try {
+        res.set('Content-Type', promClient.register.contentType);
+        res.end(await promClient.register.metrics());
+    } catch (ex) {
+        res.status(500).end(ex);
+    }
+});
+// ------------------------
+
 const corsOptions = {
     origin: process.env.FRONTEND_URL || 'https://arroyoseco.online',
     optionsSuccessStatus: 200
@@ -14,10 +30,12 @@ app.use(cors(corsOptions));
 
 // Logging middleware
 app.use((req, res, next) => {
-    console.log(`[Gateway] ${req.method} ${req.path}`);
+    // We don't want to log every single Prometheus scrape, it gets noisy
+    if (req.path !== '/metrics') {
+        console.log(`[Gateway] ${req.method} ${req.path}`);
+    }
     next();
 });
-
 // Health check
 app.get('/health', (req, res) => {
     res.json({ status: 'OK', service: 'API Gateway' });
