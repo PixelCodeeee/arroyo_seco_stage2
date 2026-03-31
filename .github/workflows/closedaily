@@ -6,7 +6,7 @@ on:
     - cron: '0 0 * * 2-6'
 
 jobs:
-  close_issue:
+  close_issue:    
     runs-on: ubuntu-latest
     permissions:
       issues: write

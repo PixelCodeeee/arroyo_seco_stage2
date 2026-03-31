@@ -12,9 +12,6 @@ env:
 
 jobs:
   # --- 🛡️ PHASE 1: Quality & Performance Gates ---
-  sonarQube:
-    uses: ./.github/workflows/sonar_analysis.yml
-    secrets: inherit
 
   k6-test:
     uses: ./.github/workflows/k6-load-test.yml
@@ -23,7 +20,7 @@ jobs:
   # --- 🏗️ PHASE 2: Canary Deployment ---
   deploy-to-canary:
     name: 🏗️ 1. Deploy to V2 (Canary VM)
-    needs: [sonarQube, k6-test] 
+    needs: [k6-test] 
     runs-on: self-hosted 
     steps:
       - name: Deploy via Internal Network

@@ -7,7 +7,7 @@ const { verifyToken, verifyAdmin, verifyoferente } = require('../middleware/auth
 router.get('/', categoriaController.obtenerCategorias);
 
 // Protected
-router.post('/', verifyToken, verifyoferente, categoriaController.crearCategoria); // Or admin?
+router.post('/', verifyToken, verifyAdmin, categoriaController.crearCategoria);
 router.put('/:id', verifyToken, verifyAdmin, categoriaController.actualizarCategoria);
 router.delete('/:id', verifyToken, verifyAdmin, categoriaController.eliminarCategoria);
 
