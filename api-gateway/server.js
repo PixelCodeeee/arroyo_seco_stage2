@@ -8,7 +8,23 @@ const rateLimit = require('express-rate-limit');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+app.set('trust proxy', 1);
 app.use(helmet());
+
+// Health check
+app.get('/health', (req, res) => {
+    res.json({ status: 'OK', service: 'API Gateway' });
+});
+
+// Catch-all for stubborn GCP Health Checks
+app.get('/api/', (req, res) => {
+    res.status(200).send('GCP Health Check OK');
+});
+
+// Default route
+app.get('/', (req, res) => {
+    res.send('Arroyo Seco API Gateway Running');
+});
 
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, 
@@ -47,15 +63,7 @@ app.use((req, res, next) => {
     }
     next();
 });
-// Health check
-app.get('/health', (req, res) => {
-    res.json({ status: 'OK', service: 'API Gateway' });
-});
 
-// Catch-all for stubborn GCP Health Checks
-app.get('/api/', (req, res) => {
-    res.status(200).send('GCP Health Check OK');
-});
 
 // Service URLs
 const AUTH_SERVICE = process.env.AUTH_SERVICE_URL || 'http://localhost:5001';
@@ -153,10 +161,7 @@ app.use('/api/announcements', proxy(ANNOUNCEMENTS_SERVICE, {
     }
 }));
 
-// Default route
-app.get('/', (req, res) => {
-    res.send('Arroyo Seco API Gateway Running');
-});
+
 
 if (require.main === module) {
     app.listen(PORT, () => {
