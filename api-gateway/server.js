@@ -4,6 +4,7 @@ const cors = require('cors');
 const proxy = require('express-http-proxy');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const promClient = require('prom-client');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
