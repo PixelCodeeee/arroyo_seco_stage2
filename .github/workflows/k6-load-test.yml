@@ -57,6 +57,7 @@ jobs:
       - name: Start Services
         run: |
           # 🚨 Removed 'export PORT=5002' so it doesn't hijack the API Gateway!
+          export NODE_ENV=test
           export DB_HOST=127.0.0.1
           export DB_USER=root
           export DB_PASSWORD=''

@@ -36,7 +36,8 @@ app.get('/', (req, res) => {
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, 
     max: 1000, 
-    message: { error: 'Too many requests, please try again later.' }
+    message: { error: 'Too many requests, please try again later.' },
+    skip: (req) => process.env.NODE_ENV === 'test'
 });
 app.use(limiter);
 
@@ -77,76 +78,25 @@ const PAYMENT_SERVICE = process.env.PAYMENT_SERVICE_URL || 'http://localhost:500
 const ANNOUNCEMENTS_SERVICE = process.env.ANNOUNCEMENTS_SERVICE_URL || 'http://localhost:5006';
 
 // Proxy rules
-app.use('/api/usuarios', proxy(AUTH_SERVICE, {
-    proxyReqPathResolver: (req) => `/api/usuarios${req.url}`,
+const commonProxyOptions = {
+    proxyReqPathResolver: (req) => req.originalUrl,
     proxyReqOptDecorator: (proxyReqOpts) => {
         proxyReqOpts.headers['Content-Type'] = 'application/json';
         return proxyReqOpts;
     }
-}));
+};
 
-app.use('/api/categorias', proxy(CATALOG_SERVICE, {
-    proxyReqPathResolver: (req) => `/api/categorias${req.url}`,
-    proxyReqOptDecorator: (proxyReqOpts) => {
-        proxyReqOpts.headers['Content-Type'] = 'application/json';
-        return proxyReqOpts;
-    }
-}));
-
-app.use('/api/productos', proxy(CATALOG_SERVICE, {
-    proxyReqPathResolver: (req) => `/api/productos${req.url}`,
-    proxyReqOptDecorator: (proxyReqOpts) => {
-        proxyReqOpts.headers['Content-Type'] = 'application/json';
-        return proxyReqOpts;
-    }
-}));
-
-app.use('/api/oferentes', proxy(CATALOG_SERVICE, {
-    proxyReqPathResolver: (req) => `/api/oferentes${req.url}`,
-    proxyReqOptDecorator: (proxyReqOpts) => {
-        proxyReqOpts.headers['Content-Type'] = 'application/json';
-        return proxyReqOpts;
-    }
-}));
-
-app.use('/api/servicios', proxy(CATALOG_SERVICE, {
-    proxyReqPathResolver: (req) => `/api/servicios${req.url}`,
-    proxyReqOptDecorator: (proxyReqOpts) => {
-        proxyReqOpts.headers['Content-Type'] = 'application/json';
-        return proxyReqOpts;
-    }
-}));
-
-app.use('/api/pedidos', proxy(ORDER_SERVICE, {
-    proxyReqPathResolver: (req) => `/api/pedidos${req.url}`,
-    proxyReqOptDecorator: (proxyReqOpts) => {
-        proxyReqOpts.headers['Content-Type'] = 'application/json';
-        return proxyReqOpts;
-    }
-}));
-
-app.use('/api/carrito', proxy(ORDER_SERVICE, {
-    proxyReqPathResolver: (req) => `/api/carrito${req.url}`,
-    proxyReqOptDecorator: (proxyReqOpts) => {
-        proxyReqOpts.headers['Content-Type'] = 'application/json';
-        return proxyReqOpts;
-    }
-}));
-
-app.use('/api/reservas', proxy(RESERVATION_SERVICE, {
-    proxyReqPathResolver: (req) => `/api/reservas${req.url}`,
-    proxyReqOptDecorator: (proxyReqOpts) => {
-        proxyReqOpts.headers['Content-Type'] = 'application/json';
-        return proxyReqOpts;
-    }
-}));
+app.use('/api/usuarios', proxy(AUTH_SERVICE, commonProxyOptions));
+app.use('/api/categorias', proxy(CATALOG_SERVICE, commonProxyOptions));
+app.use('/api/productos', proxy(CATALOG_SERVICE, commonProxyOptions));
+app.use('/api/oferentes', proxy(CATALOG_SERVICE, commonProxyOptions));
+app.use('/api/servicios', proxy(CATALOG_SERVICE, commonProxyOptions));
+app.use('/api/pedidos', proxy(ORDER_SERVICE, commonProxyOptions));
+app.use('/api/carrito', proxy(ORDER_SERVICE, commonProxyOptions));
+app.use('/api/reservas', proxy(RESERVATION_SERVICE, commonProxyOptions));
 
 app.use('/api/paypal', proxy(PAYMENT_SERVICE, {
-    proxyReqPathResolver: (req) => `/api/paypal${req.url}`,
-    proxyReqOptDecorator: (proxyReqOpts) => {
-        proxyReqOpts.headers['Content-Type'] = 'application/json';
-        return proxyReqOpts;
-    },
+    ...commonProxyOptions,
     userResHeaderDecorator(headers, userReq, userRes, proxyReq, proxyRes) {
         // Explicitly set CORS headers to ensure they are present and singular
         headers['access-control-allow-origin'] = process.env.FRONTEND_URL || 'https://arroyoseco.online';
@@ -156,13 +106,7 @@ app.use('/api/paypal', proxy(PAYMENT_SERVICE, {
     }
 }));
 
-app.use('/api/announcements', proxy(ANNOUNCEMENTS_SERVICE, {
-    proxyReqPathResolver: (req) => `/announcements${req.url}`,
-    proxyReqOptDecorator: (proxyReqOpts) => {
-        proxyReqOpts.headers['Content-Type'] = 'application/json';
-        return proxyReqOpts;
-    }
-}));
+app.use('/api/announcements', proxy(ANNOUNCEMENTS_SERVICE, commonProxyOptions));
 
 
 
