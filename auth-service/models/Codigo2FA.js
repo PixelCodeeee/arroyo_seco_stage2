@@ -12,47 +12,37 @@ class Codigo2FA {
         const fecha_expiracion = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
         // Delete any existing unused codes for this user
-        await db.query(
-            'DELETE FROM codigo_2fa WHERE id_usuario = ? AND usado = FALSE',
-            [userId]
-        );
+        await db.$executeRaw`DELETE FROM codigo_2fa WHERE id_usuario = ${parseInt(userId, 10)} AND usado = FALSE`;
 
         // Insert new code
-        await db.query(
-            'INSERT INTO codigo_2fa (id_usuario, codigo, fecha_expiracion) VALUES (?, ?, ?)',
-            [userId, codigo, fecha_expiracion]
-        );
+        await db.$executeRaw`INSERT INTO codigo_2fa (id_usuario, codigo, fecha_expiracion) VALUES (${parseInt(userId, 10)}, ${codigo}, ${fecha_expiracion})`;
 
         return codigo;
     }
 
     // Verify code
     static async verify(userId, codigo) {
-        const [results] = await db.query(
-            `SELECT * FROM codigo_2fa 
-             WHERE id_usuario = ? 
-             AND codigo = ? 
+        const results = await db.$queryRaw`
+             SELECT id FROM codigo_2fa 
+             WHERE id_usuario = ${parseInt(userId, 10)} 
+             AND codigo = ${codigo} 
              AND usado = FALSE 
-             AND fecha_expiracion > NOW()`,
-            [userId, codigo]
-        );
+             AND fecha_expiracion > NOW()
+        `;
 
         if (results.length === 0) {
             return false;
         }
 
         // Mark code as used
-        await db.query(
-            'UPDATE codigo_2fa SET usado = TRUE WHERE id = ?',
-            [results[0].id]
-        );
+        await db.$executeRaw`UPDATE codigo_2fa SET usado = TRUE WHERE id = ${results[0].id}`;
 
         return true;
     }
 
     // Clean expired codes (run periodically)
     static async cleanExpired() {
-        await db.query('DELETE FROM codigo_2fa WHERE fecha_expiracion < NOW()');
+        await db.$executeRaw`DELETE FROM codigo_2fa WHERE fecha_expiracion < NOW()`;
     }
 }
 

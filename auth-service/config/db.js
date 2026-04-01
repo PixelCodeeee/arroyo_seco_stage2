@@ -1,34 +1,13 @@
-const mysql = require('mysql2');
+const { PrismaClient } = require('@prisma/client');
 
-// Database configuration
-console.log("DEBUG: El host que estoy leyendo es:", process.env.DB_HOST);
-const dbConfig = {
-    host: process.env.DB_HOST || 'localhost',
-    port: process.env.DB_PORT || 3306,
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME || 'arroyo_seco',
-    waitForConnections: true,
-    connectionLimit: 5,
-    queueLimit: 0
-};
+console.log("DEBUG: Conectando PrismaClient en la base de datos.");
 
-// Create connection pool
-const pool = mysql.createPool(dbConfig);
+// Singleton pattern for PrismaClient
+const prisma = new PrismaClient();
 
-// Get promise-based connection
-const promisePool = pool.promise();
+// Mantener compatibilidad mínima inicial con algo de consola, pero ahora la exportación es del ORM:
+prisma.$connect()
+    .then(() => console.log('✓ Auth Service Connected to MySQL database via Prisma ORM'))
+    .catch((err) => console.error('❌ Error connecting to database via Prisma:', err.message));
 
-// Test connection
-pool.getConnection((err, connection) => {
-    if (err) {
-        console.error('❌ Error connecting to database:', err.message);
-        return;
-    }
-    console.log(`✓ Auth Service Connected to MySQL database on ${dbConfig.host}`);
-    connection.release();
-});
-
-module.exports = promisePool;
-
-
+module.exports = prisma;

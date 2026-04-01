@@ -38,9 +38,14 @@ exports.crearUsuario = async (req, res) => {
 
         const existingUser = await Usuario.findByEmail(correo);
         if (existingUser) {
-            return res.status(409).json({
-                error: 'El correo ya está registrado'
-            });
+            if (existingUser.esta_activo) {
+                return res.status(409).json({
+                    error: 'El correo ya está registrado'
+                });
+            } else {
+                // If they never finished 2FA, allow them to re-register
+                await Usuario.delete(existingUser.id_usuario);
+            }
         }
 
         const usuario = await Usuario.create({ correo, contrasena, nombre, rol });
@@ -74,6 +79,12 @@ exports.loginUsuario = async (req, res) => {
         if (!usuario) {
             return res.status(401).json({
                 error: 'Credenciales inválidas'
+            });
+        }
+        
+        if (!usuario.esta_activo) {
+            return res.status(403).json({
+                error: 'Cuenta no verificada. Por favor regístrate nuevamente.'
             });
         }
 
@@ -117,12 +128,17 @@ exports.verify2FA = async (req, res) => {
             });
         }
 
-        const usuario = await Usuario.findById(userId);
+        let usuario = await Usuario.findById(userId);
 
         if (!usuario) {
             return res.status(404).json({
                 error: 'Usuario no encontrado'
             });
+        }
+
+        // Activates the user since 2FA is verified successfully 
+        if (!usuario.esta_activo) {
+            usuario = await Usuario.update(userId, { esta_activo: true });
         }
 
         const token = jwt.sign(

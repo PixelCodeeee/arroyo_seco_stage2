@@ -10,8 +10,14 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 app.set('trust proxy', 1);
-app.use(helmet());
 
+const corsOptions = {
+    origin: process.env.FRONTEND_URL || 'https://arroyoseco.online',
+    optionsSuccessStatus: 200
+};
+app.use(cors(corsOptions));
+
+app.use(helmet({ crossOriginResourcePolicy: false }));
 // Health check
 app.get('/health', (req, res) => {
     res.json({ status: 'OK', service: 'API Gateway' });
@@ -50,11 +56,7 @@ app.get('/metrics', async (req, res) => {
 });
 // ------------------------
 
-const corsOptions = {
-    origin: process.env.FRONTEND_URL || 'https://arroyoseco.online',
-    optionsSuccessStatus: 200
-};
-app.use(cors(corsOptions));
+
 
 // Logging middleware
 app.use((req, res, next) => {
