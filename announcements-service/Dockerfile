@@ -4,9 +4,9 @@ WORKDIR /app
 
 COPY package*.json ./
 RUN npm install
-RUN npx prisma generate
 
 COPY . .
+RUN npx prisma generate
 
 EXPOSE 5006
 
