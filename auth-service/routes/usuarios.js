@@ -16,6 +16,8 @@ router.put('/:id/password', verifyToken, usuarioController.updatePassword);
 router.get('/', verifyToken, verifyAdmin, usuarioController.obtenerUsuarios);
 router.get('/:id', verifyToken, usuarioController.obtenerUsuarioPorId);
 router.put('/:id', verifyToken, usuarioController.actualizarUsuario);
+router.post('/:id/cambio-correo/solicitar', verifyToken, usuarioController.solicitarCambioCorreo);
+router.post('/:id/cambio-correo/verificar', verifyToken, usuarioController.verificarCambioCorreo);
 router.delete('/:id', verifyToken, verifyAdmin, usuarioController.eliminarUsuario);
 
 // Analíticas - stats de usuarios (solo admin)

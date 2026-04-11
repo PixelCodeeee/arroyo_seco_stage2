@@ -112,7 +112,7 @@ class Reserva {
                 servicio: { id_oferente: toInt(oferenteId) }
             },
             include: {
-                usuario: { select: { nombre: true, correo: true, telefono: true } },
+                usuario: { select: { nombre: true, correo: true } },
                 servicio: { select: { nombre: true } }
             },
             orderBy: [{ fecha: 'desc' }, { hora: 'desc' }]

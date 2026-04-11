@@ -16,6 +16,9 @@ app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+const { reservationLimiter } = require('./middleware/rateLimiter');
+app.use('/api', reservationLimiter);
+
 // Debug Middleware
 app.use((req, res, next) => {
     console.log(`[Catalog] ${req.method} ${req.path}`);
@@ -45,8 +48,8 @@ async function initDB() {
 }
 
 // Error handling middleware
-const prismaErrorHandler = require('./middleware/prismaErrorHandler');
-app.use(prismaErrorHandler);
+const errorHandler = require('./middleware/errorHandler');
+app.use(errorHandler);
 
 // Start server
 if (require.main === module) {

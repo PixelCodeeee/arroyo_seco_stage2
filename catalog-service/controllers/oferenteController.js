@@ -1,5 +1,6 @@
 const Oferente = require('../models/Oferente');
 const Usuario = require('../models/Usuario');
+const { oferenteDTO, oferentesDTO } = require('../utils/dto');
 
 exports.crearOferente = async (req, res) => {
     try {
@@ -39,7 +40,7 @@ exports.crearOferente = async (req, res) => {
 
         res.status(201).json({
             message: 'Oferente creado exitosamente (pendiente)',
-            oferente: nuevo
+            oferente: oferenteDTO(nuevo)
         });
 
     } catch (error) {
@@ -59,7 +60,7 @@ exports.obtenerOferentes = async (req, res) => {
             data = await Oferente.findAll();
         }
 
-        res.json({ total: data.length, oferentes: data });
+        res.json({ total: data.length, oferentes: oferentesDTO(data) });
 
     } catch (error) {
         console.error('Error fetching oferentes:', error);
@@ -75,7 +76,7 @@ exports.obtenerOferentePorId = async (req, res) => {
             return res.status(404).json({ error: 'Oferente no encontrado' });
         }
 
-        res.json(oferente);
+        res.json(oferenteDTO(oferente));
 
     } catch (error) {
         console.error('Error fetching oferente:', error);
@@ -91,7 +92,7 @@ exports.obtenerOferentePorUsuario = async (req, res) => {
             return res.status(404).json({ error: 'No existe oferente para este usuario' });
         }
 
-        res.json(oferente);
+        res.json(oferenteDTO(oferente));
 
     } catch (error) {
         console.error('Error fetching oferente:', error);
@@ -108,6 +109,16 @@ exports.actualizarOferente = async (req, res) => {
             return res.status(404).json({ error: 'Oferente no encontrado' });
         }
 
+        // Authorization check. IDOR prevention.
+        if (req.user && req.user.rol === 'oferente') {
+            const oferenteDelUsuario = await Oferente.findByUserId(req.user.id);
+            if (!oferenteDelUsuario || oferenteDelUsuario.id_oferente !== parseInt(oferenteId, 10)) {
+                return res.status(403).json({ error: "No autorizado para modificar perfiles de otros oferentes" });
+            }
+        } else if (req.user && req.user.rol !== 'admin') {
+            return res.status(403).json({ error: "No autorizado" });
+        }
+
         const { nombre_negocio, direccion, tipo, horario_disponibilidad, imagen, telefono } = req.body;
 
         const updated = await Oferente.update(oferenteId, {
@@ -121,7 +132,7 @@ exports.actualizarOferente = async (req, res) => {
 
         res.json({
             message: 'Oferente actualizado',
-            oferente: updated
+            oferente: oferenteDTO(updated)
         });
 
     } catch (error) {
@@ -152,7 +163,7 @@ exports.actualizarEstadoOferente = async (req, res) => {
 
         res.json({
             message: `Estado actualizado a ${estado}`,
-            oferente: actualizado
+            oferente: oferenteDTO(actualizado)
         });
 
     } catch (error) {

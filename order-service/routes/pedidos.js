@@ -8,7 +8,7 @@ const { verifyToken, verifyAdmin, verifyoferente } = require('../middleware/auth
 router.post('/', verifyToken, pedidoController.crearPedido);
 
 // Admin routes
-router.get('/', verifyToken, verifyAdmin, pedidoController.obtenerPedidos);
+router.get('/', verifyToken, pedidoController.obtenerPedidos);
 router.patch('/:id/estado', verifyToken, verifyAdmin, pedidoController.cambiarEstado);
 router.delete('/:id', verifyToken, verifyAdmin, pedidoController.eliminarPedido);
 

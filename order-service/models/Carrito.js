@@ -29,6 +29,12 @@ class Carrito {
         }));
     }
 
+    static async findById(id_carrito) {
+        return await prisma.carrito.findUnique({
+            where: { id_carrito: parseInt(id_carrito, 10) }
+        });
+    }
+
     static async findByUsuario(id_usuario) {
         const items = await prisma.carrito.findMany({
             where: { id_usuario: parseInt(id_usuario, 10) },

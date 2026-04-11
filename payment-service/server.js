@@ -16,6 +16,9 @@ app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+const { reservationLimiter } = require('./middleware/rateLimiter');
+app.use('/api', reservationLimiter);
+
 // Routes
 app.use('/api/mercadopago', require('./routes/mercadopago'));
 
@@ -35,8 +38,8 @@ async function initDB() {
 }
 
 // Error handling middleware
-const prismaErrorHandler = require('./middleware/prismaErrorHandler');
-app.use(prismaErrorHandler);
+const errorHandler = require('./middleware/errorHandler');
+app.use(errorHandler);
 
 // Start server
 app.listen(PORT, async () => {

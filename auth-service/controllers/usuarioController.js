@@ -2,12 +2,13 @@ const Usuario = require('../models/Usuario');
 const Codigo2FA = require('../models/Codigo2FA');
 const emailService = require('../services/emailService');
 const jwt = require('jsonwebtoken');
+const { usuarioDTO, usuariosDTO } = require('../utils/dto');
 
 // Allowed roles
 const ROLES_VALIDOS = ['turista', 'oferente', 'admin'];
 
 // CREATE - Register new user (with 2FA)
-exports.crearUsuario = async (req, res) => {
+exports.crearUsuario = async (req, res, next) => {
     try {
         const { correo, contrasena, nombre, rol } = req.body;
 
@@ -59,13 +60,12 @@ exports.crearUsuario = async (req, res) => {
             userId: usuario.id_usuario
         });
     } catch (error) {
-        console.error('Error creating user:', error);
-        res.status(500).json({ error: 'Error al crear usuario' });
+        next(error);
     }
 };
 
 // LOGIN - Step 1: Verify credentials and send 2FA code
-exports.loginUsuario = async (req, res) => {
+exports.loginUsuario = async (req, res, next) => {
     try {
         const { correo, contrasena } = req.body;
 
@@ -104,13 +104,12 @@ exports.loginUsuario = async (req, res) => {
             userId: usuario.id_usuario
         });
     } catch (error) {
-        console.error('Error during login:', error);
-        res.status(500).json({ error: 'Error al iniciar sesión' });
+        next(error);
     }
 };
 
 // LOGIN - Step 2: Verify 2FA code and issue token
-exports.verify2FA = async (req, res) => {
+exports.verify2FA = async (req, res, next) => {
     try {
         const { userId, codigo } = req.body;
 
@@ -141,37 +140,33 @@ exports.verify2FA = async (req, res) => {
             usuario = await Usuario.update(userId, { esta_activo: true });
         }
 
+        if (!process.env.JWT_SECRET) {
+            throw new Error('JWT_SECRET is not defined');
+        }
+
         const token = jwt.sign(
             { id: usuario.id_usuario, correo: usuario.correo, rol: usuario.rol },
-            process.env.JWT_SECRET || '123',
+            process.env.JWT_SECRET,
             { expiresIn: '24h' }
         );
 
         res.json({
             message: 'Autenticación exitosa',
             token: token,
-            user: {
-                id_usuario: usuario.id_usuario,
-                correo: usuario.correo,
-                nombre: usuario.nombre,
-                rol: usuario.rol,
-                esta_activo: usuario.esta_activo
-            }
+            user: usuarioDTO(usuario)
         });
     } catch (error) {
-        console.error('Error verifying 2FA:', error);
-        res.status(500).json({ error: 'Error al verificar el código' });
+        next(error);
     }
 };
 
 // Resend 2FA code
-exports.resend2FACode = async (req, res) => {
+exports.resend2FACode = async (req, res, next) => {
     try {
-        const { userId } = req.body;
+        let { userId } = req.body;
+        userId = parseInt(userId, 10);
 
-        if (!userId) {
-            return res.status(400).json({ error: 'Usuario requerido' });
-        }
+        if (isNaN(userId)) return res.status(400).json({ error: 'Usuario requerido y válido' });
 
         const usuario = await Usuario.findById(userId);
 
@@ -184,12 +179,11 @@ exports.resend2FACode = async (req, res) => {
 
         res.json({ message: 'Código reenviado exitosamente' });
     } catch (error) {
-        console.error('Error resending 2FA code:', error);
-        res.status(500).json({ error: 'Error al reenviar el código' });
+        next(error);
     }
 };
 
-exports.forgotPassword = async (req, res) => {
+exports.forgotPassword = async (req, res, next) => {
     try {
         const { correo } = req.body;
         if (!correo) return res.status(400).json({ error: 'Correo requerido' });
@@ -204,12 +198,11 @@ exports.forgotPassword = async (req, res) => {
 
         res.json({ message: 'Si el correo existe, el código fue enviado.' });
     } catch (error) {
-        console.error('Error in forgotPassword:', error);
-        res.status(500).json({ error: 'Error al procesar solicitud' });
+        next(error);
     }
 };
 
-exports.resetPassword = async (req, res) => {
+exports.resetPassword = async (req, res, next) => {
     try {
         const { correo, codigo, nuevaContrasena } = req.body;
         if (!correo || !codigo || !nuevaContrasena) {
@@ -230,17 +223,18 @@ exports.resetPassword = async (req, res) => {
 
         res.json({ message: 'Contraseña actualizada exitosamente' });
     } catch (error) {
-        console.error('Error in resetPassword:', error);
-        res.status(500).json({ error: 'Error al restablecer contraseña' });
+        next(error);
     }
 };
 
-exports.updatePassword = async (req, res) => {
+exports.updatePassword = async (req, res, next) => {
     try {
         const { contrasenaActual, nuevaContrasena } = req.body;
-        const userId = req.params.id;
+        const userId = parseInt(req.params.id, 10);
 
-        if (req.user.id.toString() !== userId && req.user.rol !== 'admin') {
+        if (isNaN(userId)) return res.status(400).json({ error: "ID inválido" });
+
+        if (req.user.id !== userId && req.user.rol !== 'admin') {
             return res.status(403).json({ error: 'No autorizado para cambiar la contraseña de este usuario' });
         }
 
@@ -258,63 +252,67 @@ exports.updatePassword = async (req, res) => {
 
         res.json({ message: 'Contraseña actualizada exitosamente' });
     } catch (error) {
-        console.error('Error in updatePassword:', error);
-        res.status(500).json({ error: 'Error al cambiar contraseña' });
+        next(error);
     }
 };
 
-exports.obtenerUsuarios = async (req, res) => {
+exports.obtenerUsuarios = async (req, res, next) => {
     try {
         const usuarios = await Usuario.findAll();
         res.json({
             total: usuarios.length,
-            usuarios
+            usuarios: usuariosDTO(usuarios)
         });
     } catch (error) {
-        console.error('Error fetching users:', error);
-        res.status(500).json({ error: 'Error al obtener usuarios' });
+        next(error);
     }
 };
 
-exports.obtenerUsuarioPorId = async (req, res) => {
+exports.obtenerUsuarioPorId = async (req, res, next) => {
     try {
-        const usuario = await Usuario.findById(req.params.id);
+        const id = parseInt(req.params.id, 10);
+        if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
+
+        const usuario = await Usuario.findById(id);
 
         if (!usuario) {
             return res.status(404).json({ error: 'Usuario no encontrado' });
         }
 
-        res.json(usuario);
+        // Return safely without IDOR protection here as profiles might be safe to view 
+        // Or if strictly private, we could add: if (req.user.rol === 'turista' && req.user.id !== id) error;
+
+        res.json(usuarioDTO(usuario));
     } catch (error) {
-        console.error('Error fetching user:', error);
-        res.status(500).json({ error: 'Error al obtener usuario' });
+        next(error);
     }
 };
 
-exports.actualizarUsuario = async (req, res) => {
+exports.actualizarUsuario = async (req, res, next) => {
     try {
         const { correo, contrasena, nombre, rol, esta_activo } = req.body;
-        const userId = req.params.id;
+        const userId = parseInt(req.params.id, 10);
+        if (isNaN(userId)) return res.status(400).json({ error: "ID inválido" });
+
+        if (req.user && req.user.rol !== 'admin' && req.user.id !== userId) {
+             return res.status(403).json({ error: 'No autorizado' });
+        }
 
         const existingUser = await Usuario.findById(userId);
         if (!existingUser) {
             return res.status(404).json({ error: 'Usuario no encontrado' });
         }
 
-        if (correo) {
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!emailRegex.test(correo)) {
-                return res.status(400).json({
-                    error: 'Formato de correo inválido'
-                });
-            }
+        // Email changes must go through the dedicated 2FA verification flow.
+        if (correo && correo !== existingUser.correo) {
+            return res.status(400).json({
+                error: 'Para cambiar el correo, debe utilizar el flujo de verificación de correo seguro (/cambio-correo/solicitar)'
+            });
+        }
 
-            const emailExists = await Usuario.emailExists(correo, userId);
-            if (emailExists) {
-                return res.status(409).json({
-                    error: 'El correo ya está registrado por otro usuario'
-                });
-            }
+        // Correo is blocked above, but we keep this empty shell just in case
+        if (correo && correo !== existingUser.correo) {
+             // Blocked previously
         }
 
         if (rol && !ROLES_VALIDOS.includes(rol)) {
@@ -345,17 +343,23 @@ exports.actualizarUsuario = async (req, res) => {
 
         res.json({
             message: 'Usuario actualizado exitosamente',
-            usuario
+            usuario: usuarioDTO(usuario)
         });
     } catch (error) {
-        console.error('Error updating user:', error);
-        res.status(500).json({ error: 'Error al actualizar usuario' });
+        next(error);
     }
 };
 
-exports.eliminarUsuario = async (req, res) => {
+exports.eliminarUsuario = async (req, res, next) => {
     try {
-        const deleted = await Usuario.delete(req.params.id);
+        const id = parseInt(req.params.id, 10);
+        if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
+
+        if (req.user && req.user.rol !== 'admin' && req.user.id !== id) {
+             return res.status(403).json({ error: 'No autorizado' });
+        }
+
+        const deleted = await Usuario.delete(id);
 
         if (!deleted) {
             return res.status(404).json({ error: 'Usuario no encontrado' });
@@ -363,22 +367,106 @@ exports.eliminarUsuario = async (req, res) => {
 
         res.json({
             message: 'Usuario eliminado exitosamente',
-            id_usuario: req.params.id
+            id_usuario: id
         });
     } catch (error) {
-        console.error('Error deleting user:', error);
-        res.status(500).json({ error: 'Error al eliminar usuario' });
+        next(error);
     }
 };
 
 // Stats para analíticas (solo admin)
-exports.getStats = async (req, res) => {
+exports.getStats = async (req, res, next) => {
     try {
         const stats = await Usuario.getStats();
         const registrosPorMes = await Usuario.getRegistrosPorMes();
         res.json({ stats, registrosPorMes });
     } catch (error) {
-        console.error('Error fetching user stats:', error);
-        res.status(500).json({ error: 'Error al obtener estadísticas' });
+        next(error);
+    }
+};
+
+exports.solicitarCambioCorreo = async (req, res, next) => {
+    try {
+        const userId = parseInt(req.params.id, 10);
+        const { nuevoCorreo } = req.body;
+
+        if (isNaN(userId)) return res.status(400).json({ error: "ID inválido" });
+        if (!nuevoCorreo) return res.status(400).json({ error: "El nuevo correo es requerido" });
+
+        if (req.user && req.user.rol !== 'admin' && req.user.id !== userId) {
+             return res.status(403).json({ error: 'No autorizado' });
+        }
+
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(nuevoCorreo)) {
+            return res.status(400).json({ error: 'Formato de correo inválido' });
+        }
+
+        const emailExists = await Usuario.emailExists(nuevoCorreo, userId);
+        if (emailExists) {
+            return res.status(409).json({ error: 'El correo ya está registrado por otro usuario' });
+        }
+
+        const usuario = await Usuario.findById(userId);
+        if (!usuario) return res.status(404).json({ error: 'Usuario no encontrado' });
+
+        // Generate 6-digit verification code using Codigo2FA module natively
+        const codigo = await Codigo2FA.create(userId);
+
+        // Send email
+        await emailService.sendEmailChangeCode(nuevoCorreo, codigo, usuario.nombre);
+
+        // Sign token encapsulating request memory
+        const changeToken = jwt.sign(
+            { userId, nuevoCorreo, type: 'email_change' },
+            process.env.JWT_SECRET,
+            { expiresIn: '10m' }
+        );
+
+        res.json({
+            message: 'Código de verificación enviado al nuevo correo',
+            changeToken
+        });
+
+    } catch (error) {
+        next(error);
+    }
+};
+
+exports.verificarCambioCorreo = async (req, res, next) => {
+    try {
+        const userId = parseInt(req.params.id, 10);
+        const { changeToken, codigo } = req.body;
+
+        if (isNaN(userId)) return res.status(400).json({ error: "ID inválido" });
+        if (!changeToken || !codigo) return res.status(400).json({ error: "Token y código son requeridos" });
+
+        if (req.user && req.user.rol !== 'admin' && req.user.id !== userId) {
+             return res.status(403).json({ error: 'No autorizado' });
+        }
+
+        let decoded;
+        try {
+            decoded = jwt.verify(changeToken, process.env.JWT_SECRET);
+        } catch (err) {
+            return res.status(401).json({ error: 'Flujo de cambio de correo inválido o expirado' });
+        }
+
+        if (decoded.userId !== userId || decoded.type !== 'email_change') {
+            return res.status(400).json({ error: 'Token inválido para esta operación' });
+        }
+
+        const isValid = await Codigo2FA.verify(userId, codigo);
+        if (!isValid) return res.status(401).json({ error: 'Código inválido o expirado' });
+
+        const usuario = await Usuario.update(userId, { correo: decoded.nuevoCorreo });
+
+        res.json({
+            message: 'Correo actualizado exitosamente',
+            usuario: usuarioDTO(usuario)
+        });
+
+    } catch (error) {
+        next(error);
     }
 };

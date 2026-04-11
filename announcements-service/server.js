@@ -3,6 +3,9 @@ const cors = require('cors');
 require('dotenv').config();
 
 const prisma = require('./config/db');
+const { verifyAdmin } = require('./middleware/auth');
+const { reservationLimiter } = require('./middleware/rateLimiter');
+const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
 const allowedOrigins = process.env.NODE_ENV === 'production' ? ['https://arroyoseco.online'] : ['https://arroyoseco.online', 'http://localhost:5173'];
@@ -12,10 +15,11 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 app.use(express.json());
+app.use('/api', reservationLimiter); // Protect everything against spam
 
 const PORT = process.env.PORT || 5006;
 
-app.get('/api/announcements', async (req, res) => {
+app.get('/api/announcements', async (req, res, next) => {
     try {
         const rows = await prisma.announcements.findMany({
             where: { is_active: true },
@@ -23,74 +27,96 @@ app.get('/api/announcements', async (req, res) => {
         });
         res.json(rows);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        next(error);
     }
 });
 
-app.get('/api/announcements/:id', async (req, res) => {
+app.get('/api/announcements/:id', async (req, res, next) => {
     try {
+        const id = parseInt(req.params.id, 10);
+        if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
+
         const row = await prisma.announcements.findUnique({
-            where: { id: parseInt(req.params.id, 10) }
+            where: { id }
         });
         if (!row) {
             return res.status(404).json({ message: 'Announcement not found' });
         }
         res.json(row);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        next(error);
     }
 });
 
-app.post('/api/announcements', async (req, res) => {
+app.post('/api/announcements', verifyAdmin, async (req, res, next) => {
     try {
         const { title, description, image_url, event_date } = req.body;
+        
+        let validDate = null;
+        if (event_date) {
+            validDate = new Date(`${event_date}T00:00:00Z`);
+            if (isNaN(validDate.getTime())) return res.status(400).json({ error: "Fecha inválida" });
+        }
+
         const result = await prisma.announcements.create({
             data: {
                 title,
                 description,
                 image_url,
-                event_date: event_date ? new Date(event_date) : null
+                event_date: validDate
             }
         });
         res.status(201).json({ message: 'Announcement created', id: result.id });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        next(error);
     }
 });
 
-app.put('/api/announcements/:id', async (req, res) => {
+app.put('/api/announcements/:id', verifyAdmin, async (req, res, next) => {
     try {
+        const id = parseInt(req.params.id, 10);
+        if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
+
         const { title, description, image_url, event_date, is_active } = req.body;
+        
+        let validDate = null;
+        if (event_date) {
+            validDate = new Date(`${event_date}T00:00:00Z`);
+            if (isNaN(validDate.getTime())) return res.status(400).json({ error: "Fecha inválida" });
+        }
+
         await prisma.announcements.update({
-            where: { id: parseInt(req.params.id, 10) },
+            where: { id },
             data: {
                 title,
                 description,
                 image_url,
-                event_date: event_date ? new Date(event_date) : null,
+                event_date: validDate,
                 is_active: is_active !== undefined ? is_active : true
             }
         });
         res.json({ message: 'Announcement updated' });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        next(error);
     }
 });
 
-app.delete('/api/announcements/:id', async (req, res) => {
+app.delete('/api/announcements/:id', verifyAdmin, async (req, res, next) => {
     try {
+        const id = parseInt(req.params.id, 10);
+        if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
+
         await prisma.announcements.delete({
-            where: { id: parseInt(req.params.id, 10) }
+            where: { id }
         });
         res.json({ message: 'Announcement deleted' });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        next(error);
     }
 });
 
 // Error handling middleware
-const prismaErrorHandler = require('./middleware/prismaErrorHandler');
-app.use(prismaErrorHandler);
+app.use(errorHandler);
 
 app.listen(PORT, () => {
     console.log(`🚀 Announcements Service running on port ${PORT}`);

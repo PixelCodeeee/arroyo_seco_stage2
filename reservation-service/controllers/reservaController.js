@@ -1,11 +1,12 @@
 const Reserva = require('../models/Reserva');
 const Usuario = require('../models/Usuario');
 const ServicioRestaurante = require('../models/ServicioRestaurante');
+const { reservaDTO, reservasDTO } = require('../utils/dto');
 
 // Crear reserva
-exports.crearReserva = async (req, res) => {
+exports.crearReserva = async (req, res, next) => {
     try {
-        const {
+        let {
             id_usuario,
             id_servicio,
             fecha,
@@ -15,11 +16,25 @@ exports.crearReserva = async (req, res) => {
             notas
         } = req.body;
 
+        id_usuario = parseInt(id_usuario, 10);
+        id_servicio = parseInt(id_servicio, 10);
+        numero_personas = parseInt(numero_personas, 10);
+
         // Validaciones básicas
-        if (!id_usuario || !id_servicio || !fecha || !hora || !numero_personas) {
+        if (!id_usuario || isNaN(id_usuario) || !id_servicio || isNaN(id_servicio) || !fecha || !hora || !numero_personas || isNaN(numero_personas)) {
             return res.status(400).json({
-                error: "id_usuario, id_servicio, fecha, hora y numero_personas son requeridos"
+                error: "id_usuario, id_servicio, fecha, hora y numero_personas son requeridos y deben ser válidos"
             });
+        }
+
+        // Authorization / IDOR Protection
+        if (req.user && req.user.rol !== 'admin' && req.user.id !== id_usuario) {
+            return res.status(403).json({ error: "No autorizado para crear reserva para otro usuario" });
+        }
+
+        // Validar regex de hora (formato HH:MM)
+        if (!/^\d{2}:\d{2}$/.test(hora)) {
+            return res.status(400).json({ error: "Formato de hora inválido. Usa HH:MM" });
         }
 
         // Validar que el usuario exista
@@ -52,7 +67,11 @@ exports.crearReserva = async (req, res) => {
         }
 
         // Validar que la fecha no sea en el pasado
-        const fechaReserva = new Date(fecha);
+        const fechaReserva = new Date(`${fecha}T00:00:00Z`); // Construct generic to validate
+        if (isNaN(fechaReserva.getTime())) {
+            return res.status(400).json({ error: "Fecha inválida" });
+        }
+
         const hoy = new Date();
         hoy.setHours(0, 0, 0, 0);
 
@@ -68,7 +87,7 @@ exports.crearReserva = async (req, res) => {
             });
         }
 
-        // Crear reserva (las validaciones de unicidad se hacen en el modelo)
+        // Crear reserva
         const reserva = await Reserva.create({
             id_usuario,
             id_servicio,
@@ -81,101 +100,147 @@ exports.crearReserva = async (req, res) => {
 
         res.status(201).json({
             message: "Reserva creada exitosamente",
-            reserva
+            reserva: reservaDTO(reserva)
         });
 
     } catch (error) {
-        console.error("Error creating reserva:", error);
-
-        // Manejar errores de validación de unicidad
-        if (error.message.includes('Ya existe una reserva')) {
+        if (error.message && error.message.includes('Ya existe una reserva')) {
             return res.status(409).json({ error: error.message });
         }
-
-        res.status(500).json({ error: "Error al crear reserva" });
+        next(error);
     }
 };
 
-// Obtener todas las reservas
-exports.obtenerReservas = async (req, res) => {
+// Obtener todas las reservas (o las correspondientes al rol)
+exports.obtenerReservas = async (req, res, next) => {
     try {
-        const reservas = await Reserva.findAll();
-        const stats = await Reserva.getStats();
+        if (!req.user) {
+            return res.status(401).json({ error: 'No autenticado' });
+        }
+
+        let reservas = [];
+        let stats = null;
+
+        if (req.user.rol === 'admin') {
+            reservas = await Reserva.findAll();
+            stats = await Reserva.getStats();
+        } else if (req.user.rol === 'turista') {
+            reservas = await Reserva.findByUsuarioId(req.user.id);
+        } else if (req.user.rol === 'oferente') {
+            if (!req.user.oferenteId) {
+                // If middleware 'verifyToken' is used instead of 'verifyoferente', oferenteId might be missing.
+                // We should fetch it.
+                const { prisma } = require('../config/db');
+                const oferentes = await prisma.oferente.findMany({ where: { id_usuario: req.user.id } });
+                if (oferentes.length > 0) {
+                    reservas = await Reserva.findByOferenteId(oferentes[0].id_oferente);
+                }
+            } else {
+                reservas = await Reserva.findByOferenteId(req.user.oferenteId);
+            }
+        }
 
         res.json({
             total: reservas.length,
             stats,
-            reservas
+            reservas: reservasDTO(reservas)
         });
     } catch (error) {
-        console.error('Error fetching reservas:', error);
-        res.status(500).json({ error: 'Error al obtener reservas' });
+        next(error);
     }
 };
 
 // Obtener reserva por ID
-exports.obtenerReservaPorId = async (req, res) => {
+exports.obtenerReservaPorId = async (req, res, next) => {
     try {
-        const reserva = await Reserva.findById(req.params.id);
+        const id = parseInt(req.params.id, 10);
+        if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
+
+        const reserva = await Reserva.findById(id);
 
         if (!reserva) {
             return res.status(404).json({ error: 'Reserva no encontrada' });
         }
 
-        res.json(reserva);
+        if (req.user && req.user.rol !== 'admin') {
+            if (req.user.rol === 'turista' && reserva.id_usuario !== req.user.id) {
+                return res.status(403).json({ error: 'No autorizado' });
+            }
+            if (req.user.rol === 'oferente') {
+                const servicio = await ServicioRestaurante.findById(reserva.id_servicio);
+                if (!servicio || servicio.id_oferente !== req.user.oferenteId) {
+                    return res.status(403).json({ error: 'No autorizado para ver reserva de otro oferente' });
+                }
+            }
+        }
+
+        res.json(reservaDTO(reserva));
     } catch (error) {
-        console.error('Error fetching reserva:', error);
-        res.status(500).json({ error: 'Error al obtener reserva' });
+        next(error);
     }
 };
 
 // Obtener reservas por usuario
-exports.obtenerReservasPorUsuario = async (req, res) => {
+exports.obtenerReservasPorUsuario = async (req, res, next) => {
     try {
-        const reservas = await Reserva.findByUsuarioId(req.params.usuarioId);
+        const usuarioId = parseInt(req.params.usuarioId, 10);
+        if (isNaN(usuarioId)) return res.status(400).json({ error: "ID inválido" });
+
+        if (req.user && req.user.rol !== 'admin' && req.user.id !== usuarioId) {
+            return res.status(403).json({ error: 'No autorizado' });
+        }
+
+        const reservas = await Reserva.findByUsuarioId(usuarioId);
 
         res.json({
             total: reservas.length,
-            reservas
+            reservas: reservasDTO(reservas)
         });
     } catch (error) {
-        console.error('Error fetching reservas:', error);
-        res.status(500).json({ error: 'Error al obtener reservas del usuario' });
+        next(error);
     }
 };
 
 // Obtener reservas por servicio
-exports.obtenerReservasPorServicio = async (req, res) => {
+exports.obtenerReservasPorServicio = async (req, res, next) => {
     try {
-        const reservas = await Reserva.findByServicioId(req.params.servicioId);
+        const servicioId = parseInt(req.params.servicioId, 10);
+        if (isNaN(servicioId)) return res.status(400).json({ error: "ID inválido" });
+
+        const reservas = await Reserva.findByServicioId(servicioId);
 
         res.json({
             total: reservas.length,
-            reservas
+            reservas: reservasDTO(reservas)
         });
     } catch (error) {
-        console.error('Error fetching reservas:', error);
-        res.status(500).json({ error: 'Error al obtener reservas del servicio' });
+        next(error);
     }
 };
 
 // Obtener reservas por oferente
-exports.obtenerReservasPorOferente = async (req, res) => {
+exports.obtenerReservasPorOferente = async (req, res, next) => {
     try {
-        const reservas = await Reserva.findByOferenteId(req.params.oferenteId);
+        const oferenteId = parseInt(req.params.oferenteId, 10);
+        if (isNaN(oferenteId)) return res.status(400).json({ error: "ID inválido" });
+
+        if (req.user && req.user.rol === 'oferente' && req.user.oferenteId !== oferenteId) {
+            return res.status(403).json({ error: 'No autorizado' });
+        }
+
+        const reservas = await Reserva.findByOferenteId(oferenteId);
 
         res.json({
             total: reservas.length,
-            reservas
+            reservas: reservasDTO(reservas)
         });
     } catch (error) {
-        console.error('Error fetching reservas:', error);
-        res.status(500).json({ error: 'Error al obtener reservas del oferente' });
+        next(error);
     }
 };
 
 // Obtener reservas por estado
-exports.obtenerReservasPorEstado = async (req, res) => {
+exports.obtenerReservasPorEstado = async (req, res, next) => {
     try {
         const { estado } = req.params;
 
@@ -187,20 +252,18 @@ exports.obtenerReservasPorEstado = async (req, res) => {
         }
 
         const reservas = await Reserva.findByEstado(estado);
-
         res.json({
             total: reservas.length,
             estado,
-            reservas
+            reservas: reservasDTO(reservas)
         });
     } catch (error) {
-        console.error('Error fetching reservas:', error);
-        res.status(500).json({ error: 'Error al obtener reservas por estado' });
+        next(error);
     }
 };
 
 // Actualizar reserva
-exports.actualizarReserva = async (req, res) => {
+exports.actualizarReserva = async (req, res, next) => {
     try {
         const {
             id_servicio,
@@ -211,7 +274,8 @@ exports.actualizarReserva = async (req, res) => {
             notas
         } = req.body;
 
-        const id = req.params.id;
+        const id = parseInt(req.params.id, 10);
+        if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
 
         // Verificar que la reserva existe
         const reserva = await Reserva.findById(id);
@@ -219,9 +283,23 @@ exports.actualizarReserva = async (req, res) => {
             return res.status(404).json({ error: "Reserva no encontrada" });
         }
 
+        // IDOR Validation
+        if (req.user && req.user.rol !== 'admin') {
+            if (req.user.rol === 'turista' && reserva.id_usuario !== req.user.id) {
+                return res.status(403).json({ error: "No autorizado" });
+            }
+            if (req.user.rol === 'oferente') {
+                const servicio = await ServicioRestaurante.findById(reserva.id_servicio);
+                if (!servicio || servicio.id_oferente !== req.user.oferenteId) {
+                    return res.status(403).json({ error: 'No autorizado' });
+                }
+            }
+        }
+
         // Si se actualiza el servicio, validar que exista
         if (id_servicio !== undefined) {
-            const servicio = await ServicioRestaurante.findById(id_servicio);
+            if (isNaN(parseInt(id_servicio, 10))) return res.status(400).json({ error: "id_servicio inválido" });
+            const servicio = await ServicioRestaurante.findById(parseInt(id_servicio, 10));
             if (!servicio) {
                 return res.status(404).json({ error: "El servicio no existe" });
             }
@@ -231,19 +309,27 @@ exports.actualizarReserva = async (req, res) => {
         }
 
         // Validar número de personas
-        if (numero_personas !== undefined && numero_personas < 1) {
-            return res.status(400).json({ error: "El número de personas debe ser al menos 1" });
+        if (numero_personas !== undefined) {
+            const parsedN = parseInt(numero_personas, 10);
+            if (isNaN(parsedN) || parsedN < 1) {
+                return res.status(400).json({ error: "El número de personas debe ser válido y al menos 1" });
+            }
         }
 
         // Validar fecha
         if (fecha !== undefined) {
-            const fechaReserva = new Date(fecha);
+            const fechaReserva = new Date(`${fecha}T00:00:00Z`);
+            if (isNaN(fechaReserva.getTime())) return res.status(400).json({ error: "Fecha inválida" });
             const hoy = new Date();
             hoy.setHours(0, 0, 0, 0);
 
             if (fechaReserva < hoy) {
                 return res.status(400).json({ error: "No se pueden hacer reservas en fechas pasadas" });
             }
+        }
+
+        if (hora !== undefined && !/^\d{2}:\d{2}$/.test(hora)) {
+            return res.status(400).json({ error: "Formato de hora inválido. Usa HH:MM" });
         }
 
         // Validar estado
@@ -257,10 +343,10 @@ exports.actualizarReserva = async (req, res) => {
         }
 
         const actualizada = await Reserva.update(id, {
-            id_servicio,
+            id_servicio: id_servicio !== undefined ? parseInt(id_servicio, 10) : undefined,
             fecha,
             hora,
-            numero_personas,
+            numero_personas: numero_personas !== undefined ? parseInt(numero_personas, 10) : undefined,
             estado,
             notas
         });
@@ -271,26 +357,23 @@ exports.actualizarReserva = async (req, res) => {
 
         res.json({
             message: "Reserva actualizada exitosamente",
-            reserva: actualizada
+            reserva: reservaDTO(actualizada)
         });
 
     } catch (error) {
-        console.error("Error updating reserva:", error);
-
-        // Manejar errores de validación de unicidad
-        if (error.message.includes('Ya existe una reserva')) {
+        if (error.message && error.message.includes('Ya existe una reserva')) {
             return res.status(409).json({ error: error.message });
         }
-
-        res.status(500).json({ error: "Error al actualizar reserva" });
+        next(error);
     }
 };
 
 // Cambiar estado de reserva (endpoint específico)
-exports.cambiarEstado = async (req, res) => {
+exports.cambiarEstado = async (req, res, next) => {
     try {
         const { estado } = req.body;
-        const id = req.params.id;
+        const id = parseInt(req.params.id, 10);
+        if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
 
         if (!estado) {
             return res.status(400).json({ error: "El estado es requerido" });
@@ -303,35 +386,53 @@ exports.cambiarEstado = async (req, res) => {
             });
         }
 
-        const reserva = await Reserva.updateEstado(id, estado);
-
+        // Authorization check for changing status. Either Admin or the exact oferente
+        const reserva = await Reserva.findById(id);
         if (!reserva) {
             return res.status(404).json({ error: "Reserva no encontrada" });
         }
 
+        if (req.user && req.user.rol === 'oferente') {
+            const servicio = await ServicioRestaurante.findById(reserva.id_servicio);
+            if (!servicio || servicio.id_oferente !== req.user.oferenteId) {
+                return res.status(403).json({ error: "No autorizado para modificar esta reserva" });
+            }
+        }
+        else if (req.user && req.user.rol === 'turista') {
+            if (estado !== 'cancelada' || reserva.id_usuario !== req.user.id) {
+                return res.status(403).json({ error: "No autorizado" });
+            }
+        }
+
+        const r = await Reserva.updateEstado(id, estado);
+
         res.json({
             message: `Reserva ${estado} exitosamente`,
-            reserva
+            reserva: reservaDTO(r)
         });
 
     } catch (error) {
-        console.error("Error changing estado:", error);
-        res.status(500).json({ error: "Error al cambiar estado de reserva" });
+        next(error);
     }
 };
 
 // Verificar disponibilidad
-exports.verificarDisponibilidad = async (req, res) => {
+exports.verificarDisponibilidad = async (req, res, next) => {
     try {
         const { id_servicio, fecha, hora } = req.query;
 
-        if (!id_servicio || !fecha || !hora) {
+        const servicioId = parseInt(id_servicio, 10);
+        if (isNaN(servicioId) || !fecha || !hora) {
             return res.status(400).json({
-                error: "id_servicio, fecha y hora son requeridos"
+                error: "id_servicio (número validó), fecha y hora son requeridos"
             });
         }
 
-        const disponible = await Reserva.checkDisponibilidad(id_servicio, fecha, hora);
+        if (!/^\d{2}:\d{2}$/.test(hora)) {
+            return res.status(400).json({ error: "Formato de hora inválido. Usa HH:MM" });
+        }
+
+        const disponible = await Reserva.checkDisponibilidad(servicioId, fecha, hora);
 
         res.json({
             disponible,
@@ -341,15 +442,32 @@ exports.verificarDisponibilidad = async (req, res) => {
         });
 
     } catch (error) {
-        console.error("Error checking disponibilidad:", error);
-        res.status(500).json({ error: "Error al verificar disponibilidad" });
+        next(error);
     }
 };
 
 // Eliminar reserva
-exports.eliminarReserva = async (req, res) => {
+exports.eliminarReserva = async (req, res, next) => {
     try {
-        const deleted = await Reserva.delete(req.params.id);
+        const id = parseInt(req.params.id, 10);
+        if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
+
+        // IDOR checking
+        const reserva = await Reserva.findById(id);
+        if (!reserva) {
+            return res.status(404).json({ error: "Reserva no encontrada" });
+        }
+
+        if (req.user && req.user.rol !== 'admin') {
+            if (req.user.rol === 'turista' && reserva.id_usuario !== req.user.id) {
+                return res.status(403).json({ error: "No autorizado para eliminar" });
+            }
+            if (req.user.rol === 'oferente') {
+                return res.status(403).json({ error: "Los oferentes no pueden eliminar reservas, solo cancelarlas" });
+            }
+        }
+
+        const deleted = await Reserva.delete(id);
 
         if (!deleted) {
             return res.status(404).json({ error: 'Reserva no encontrada' });
@@ -357,16 +475,15 @@ exports.eliminarReserva = async (req, res) => {
 
         res.json({
             message: 'Reserva eliminada exitosamente',
-            id_reserva: req.params.id
+            id_reserva: id
         });
     } catch (error) {
-        console.error('Error deleting reserva:', error);
-        res.status(500).json({ error: 'Error al eliminar reserva' });
+        next(error);
     }
 };
 
 // Top servicios más reservados (recomendaciones)
-exports.getTopServicios = async (req, res) => {
+exports.getTopServicios = async (req, res, next) => {
     try {
         const limit = parseInt(req.query.limit) || 10;
         const servicios = await Reserva.getTopServicios(limit);
@@ -375,18 +492,16 @@ exports.getTopServicios = async (req, res) => {
             servicios
         });
     } catch (error) {
-        console.error('Error fetching top servicios:', error);
-        res.status(500).json({ error: 'Error al obtener top servicios' });
+        next(error);
     }
 };
 
 // Stats para analíticas (solo admin)
-exports.getStatsAnaliticas = async (req, res) => {
+exports.getStatsAnaliticas = async (req, res, next) => {
     try {
         const stats = await Reserva.getStatsAnaliticas();
         res.json(stats);
     } catch (error) {
-        console.error('Error fetching stats analiticas:', error);
-        res.status(500).json({ error: 'Error al obtener estadísticas' });
+        next(error);
     }
 };

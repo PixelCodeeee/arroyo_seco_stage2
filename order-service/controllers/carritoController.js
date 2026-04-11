@@ -1,14 +1,13 @@
 const Carrito = require('../models/Carrito');
 const Producto = require('../models/Producto');
+const { carritoDTO, carritosDTO } = require('../utils/dto');
 
 // Obtener carrito del usuario
-exports.getCarrito = async (req, res) => {
+exports.getCarrito = async (req, res, next) => {
     try {
-        const id_usuario = req.user.id; // Corrected: from 'id' in token (Usuario model uses 'id_usuario' but token usually has 'id')
-        // Wait, let's check auth middleware in auth-service.
-        // In auth-service/middleware/auth.js: req.user = decoded;
-        // In auth-service/controllers/usuarioController.js: token payload is { id: usuario.id_usuario, ... }
-        // So req.user.id is correct.
+        const id_usuario = req.user.id; 
+
+        if (isNaN(id_usuario)) return res.status(400).json({ error: "Usuario ID inválido" });
 
         const items = await Carrito.findByUsuario(id_usuario);
         const total = await Carrito.getTotal(id_usuario);
@@ -17,26 +16,28 @@ exports.getCarrito = async (req, res) => {
         res.json({
             success: true,
             data: {
-                items,
+                items: carritosDTO(items),
                 total,
                 cantidadItems
             }
         });
     } catch (error) {
-        console.error('Error al obtener carrito:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error al obtener carrito',
-            error: error.message
-        });
+        next(error);
     }
 };
 
 // Agregar producto al carrito
-exports.agregarAlCarrito = async (req, res) => {
+exports.agregarAlCarrito = async (req, res, next) => {
     try {
         const id_usuario = req.user.id;
-        const { id_producto, cantidad = 1 } = req.body;
+        let { id_producto, cantidad = 1 } = req.body;
+
+        id_producto = parseInt(id_producto, 10);
+        cantidad = parseInt(cantidad, 10);
+
+        if (isNaN(id_producto) || isNaN(cantidad) || cantidad < 1) {
+             return res.status(400).json({ error: "id_producto y cantidad deben ser válidos" });
+        }
 
         // Validar que el producto existe y está disponible
         const producto = await Producto.findById(id_producto);
@@ -75,29 +76,31 @@ exports.agregarAlCarrito = async (req, res) => {
             data: { id_carrito }
         });
     } catch (error) {
-        console.error('Error al agregar al carrito:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error al agregar producto al carrito',
-            error: error.message
-        });
+        next(error);
     }
 };
 
 // Actualizar cantidad de un item
-exports.actualizarCantidad = async (req, res) => {
+exports.actualizarCantidad = async (req, res, next) => {
     try {
-        const { id_carrito } = req.params;
-        const { cantidad } = req.body;
+        const id_carrito = parseInt(req.params.id_carrito, 10);
+        const cantidad = parseInt(req.body.cantidad, 10);
 
-        if (cantidad < 0) {
+        if (isNaN(id_carrito) || isNaN(cantidad) || cantidad < 0) {
             return res.status(400).json({
                 success: false,
-                message: 'Cantidad inválida'
+                message: 'ID o Cantidad inválida'
             });
         }
-
-        // TODO: Agregar validación de que el carrito pertenece al usuario
+        
+        // Authorization logic for Carrito bounds
+        const item = await Carrito.findById(id_carrito);
+        if (!item) {
+             return res.status(404).json({ success: false, message: 'Item no encontrado' });
+        }
+        if (item.id_usuario !== req.user.id) {
+             return res.status(403).json({ success: false, message: 'No autorizado para modificar este carrito' });
+        }
 
         const actualizado = await Carrito.updateCantidad(id_carrito, cantidad);
 
@@ -113,22 +116,24 @@ exports.actualizarCantidad = async (req, res) => {
             message: cantidad === 0 ? 'Item eliminado del carrito' : 'Cantidad actualizada'
         });
     } catch (error) {
-        console.error('Error al actualizar cantidad:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error al actualizar cantidad',
-            error: error.message
-        });
+        next(error);
     }
 };
 
 // Eliminar item del carrito
-exports.eliminarItem = async (req, res) => {
+exports.eliminarItem = async (req, res, next) => {
     try {
-        const { id_carrito } = req.params;
+        const id_carrito = parseInt(req.params.id_carrito, 10);
+        if (isNaN(id_carrito)) return res.status(400).json({ error: "ID de carrito inválido" });
 
-        // TODO: Agregar validación de que el carrito pertenece al usuario
-
+        const item = await Carrito.findById(id_carrito);
+        if (!item) {
+             return res.status(404).json({ success: false, message: 'Item no encontrado' });
+        }
+        if (item.id_usuario !== req.user.id) {
+             return res.status(403).json({ success: false, message: 'No autorizado para modificar este carrito' });
+        }
+        
         const eliminado = await Carrito.removeItem(id_carrito);
 
         if (!eliminado) {
@@ -143,20 +148,14 @@ exports.eliminarItem = async (req, res) => {
             message: 'Item eliminado del carrito'
         });
     } catch (error) {
-        console.error('Error al eliminar item:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error al eliminar item',
-            error: error.message
-        });
+        next(error);
     }
 };
 
 // Vaciar carrito completo
-exports.vaciarCarrito = async (req, res) => {
+exports.vaciarCarrito = async (req, res, next) => {
     try {
         const id_usuario = req.user.id;
-
         const itemsEliminados = await Carrito.clearCarrito(id_usuario);
 
         res.json({
@@ -165,20 +164,14 @@ exports.vaciarCarrito = async (req, res) => {
             itemsEliminados
         });
     } catch (error) {
-        console.error('Error al vaciar carrito:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error al vaciar carrito',
-            error: error.message
-        });
+        next(error);
     }
 };
 
 // Verificar disponibilidad de productos en el carrito
-exports.verificarDisponibilidad = async (req, res) => {
+exports.verificarDisponibilidad = async (req, res, next) => {
     try {
         const id_usuario = req.user.id;
-
         const disponibilidad = await Carrito.verificarDisponibilidad(id_usuario);
 
         res.json({
@@ -186,20 +179,14 @@ exports.verificarDisponibilidad = async (req, res) => {
             data: disponibilidad
         });
     } catch (error) {
-        console.error('Error al verificar disponibilidad:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error al verificar disponibilidad',
-            error: error.message
-        });
+        next(error);
     }
 };
 
 // Obtener carrito agrupado por oferente (útil para checkout)
-exports.getCarritoAgrupado = async (req, res) => {
+exports.getCarritoAgrupado = async (req, res, next) => {
     try {
         const id_usuario = req.user.id;
-
         const carritoAgrupado = await Carrito.getCarritoAgrupadoPoroferente(id_usuario);
         const total = await Carrito.getTotal(id_usuario);
 
@@ -211,20 +198,14 @@ exports.getCarritoAgrupado = async (req, res) => {
             }
         });
     } catch (error) {
-        console.error('Error al obtener carrito agrupado:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error al obtener carrito agrupado',
-            error: error.message
-        });
+        next(error);
     }
 };
 
 // Obtener resumen del carrito (para el badge del navbar)
-exports.getResumenCarrito = async (req, res) => {
+exports.getResumenCarrito = async (req, res, next) => {
     try {
         const id_usuario = req.user.id;
-
         const cantidadItems = await Carrito.getItemCount(id_usuario);
         const total = await Carrito.getTotal(id_usuario);
 
@@ -236,11 +217,6 @@ exports.getResumenCarrito = async (req, res) => {
             }
         });
     } catch (error) {
-        console.error('Error al obtener resumen:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error al obtener resumen del carrito',
-            error: error.message
-        });
+        next(error);
     }
 };

@@ -184,7 +184,7 @@ class Pedido {
     }
 
     static async getStatsByOferente(oferenteId) {
-        const items = await prisma.item_pedido.findMany({
+        const items = await prisma.itemPedido.findMany({
             where: {
                 producto: { id_oferente: parseInt(oferenteId, 10) },
                 pedido: { estado: 'pagado' }
@@ -216,7 +216,7 @@ class Pedido {
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-        const items = await prisma.item_pedido.findMany({
+        const items = await prisma.itemPedido.findMany({
             where: {
                 pedido: {
                     estado: { in: ['pagado', 'enviado', 'completado'] },
