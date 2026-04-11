@@ -1,15 +1,18 @@
-const db = require('../config/db');
+const { prisma } = require('../config/db');
 
 class Pedido {
 
   static async findById(id) {
-    const [rows] = await db.query('SELECT * FROM pedido WHERE id_pedido = ?', [id]);
-    return rows[0] || null;
+    return await prisma.pedido.findUnique({
+      where: { id_pedido: parseInt(id, 10) }
+    });
   }
 
   static async updateEstado(id, estado) {
-    await db.query('UPDATE pedido SET estado = ? WHERE id_pedido = ?', [estado, id]);
-    return this.findById(id);
+    return await prisma.pedido.update({
+      where: { id_pedido: parseInt(id, 10) },
+      data: { estado }
+    });
   }
 
   static async create(data) {
@@ -18,45 +21,30 @@ class Pedido {
       monto_total,
       estado,
       items,
-      metodo_pago  = 'mercadopago',
-      payment_id   = null,
-      id_oferente  = null
+      metodo_pago = 'mercadopago',
+      payment_id = null,
+      id_oferente = null
     } = data;
 
-    const connection = await db.getConnection();
-
-    try {
-      await connection.beginTransaction();
-
-      const [result] = await connection.query(
-        `INSERT INTO pedido 
-         (id_usuario, monto_total, estado, metodo_pago, payment_id, id_oferente) 
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        [id_usuario, monto_total, estado, metodo_pago, payment_id, id_oferente]
-      );
-
-      const id_pedido = result.insertId;
-
-      for (const item of items) {
-        await connection.query(
-          `INSERT INTO item_pedido 
-           (id_pedido, id_producto, cantidad, precio_compra) 
-           VALUES (?, ?, ?, ?)`,
-          [id_pedido, item.id_producto, item.cantidad, item.precio_compra]
-        );
+    const pedido = await prisma.pedido.create({
+      data: {
+        id_usuario: parseInt(id_usuario, 10),
+        monto_total: parseFloat(monto_total),
+        estado: estado,
+        metodo_pago: metodo_pago,
+        payment_id: payment_id ? payment_id.toString() : null,
+        id_oferente: id_oferente ? parseInt(id_oferente, 10) : null,
+        items: {
+          create: items.map(item => ({
+            id_producto: parseInt(item.id_producto, 10),
+            cantidad: parseInt(item.cantidad, 10),
+            precio_compra: parseFloat(item.precio_compra)
+          }))
+        }
       }
+    });
 
-      await connection.commit();
-
-      const [rows] = await db.query('SELECT * FROM pedido WHERE id_pedido = ?', [id_pedido]);
-      return rows[0];
-
-    } catch (error) {
-      await connection.rollback();
-      throw error;
-    } finally {
-      connection.release();
-    }
+    return pedido;
   }
 
 }

@@ -1,0 +1,205 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Usuario {
+  id_usuario      Int          @id @default(autoincrement())
+  correo          String       @unique(map: "correo") @db.VarChar(255)
+  contrasena_hash String       @db.VarChar(255)
+  nombre          String       @db.VarChar(100)
+  rol             usuario_rol  @default(turista)
+  fecha_creacion  DateTime?    @default(now()) @db.Timestamp(0)
+  esta_activo     Boolean?     @default(true)
+  carritos        Carrito[]
+  codigo_2fa      codigo_2fa[]
+  oferente        Oferente[]
+  pedidos         Pedido[]
+  reserva         reserva[]
+
+  @@map("usuario")
+}
+
+model Categoria {
+  id_categoria Int            @id @default(autoincrement())
+  nombre       String         @db.VarChar(100)
+  tipo         categoria_tipo
+  productos    Producto[]
+
+  @@map("categoria")
+}
+
+model Oferente {
+  id_oferente            Int                    @id @default(autoincrement())
+  id_usuario             Int
+  nombre_negocio         String                 @db.VarChar(100)
+  direccion              String?                @db.VarChar(255)
+  tipo                   oferente_tipo
+  estado                 oferente_estado?       @default(pendiente)
+  horario_disponibilidad String?                @db.LongText
+  imagen                 String?                @db.VarChar(255)
+  telefono               String?                @db.VarChar(20)
+  mp_estado              oferente_mp_estado?    @default(pendiente)
+  mp_user_id             String?                @db.VarChar(50)
+  mp_access_token        String?                @db.Text
+  mp_refresh_token       String?                @db.Text
+  usuario                Usuario                @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade, onUpdate: Restrict, map: "oferente_ibfk_1")
+  productos              Producto[]
+  servicio_restaurante   servicio_restaurante[]
+
+  @@index([id_usuario], map: "id_usuario")
+  @@map("oferente")
+}
+
+model Producto {
+  id_producto  Int          @id @default(autoincrement())
+  id_oferente  Int
+  id_categoria Int?
+  nombre       String       @db.VarChar(100)
+  descripcion  String?      @db.Text
+  precio       Decimal      @db.Decimal(10, 2)
+  inventario   Int?         @default(0)
+  imagenes     String?      @db.LongText
+  estatus      Boolean?     @default(true)
+  carritos     Carrito[]
+  items        ItemPedido[]
+  oferente     Oferente     @relation(fields: [id_oferente], references: [id_oferente], onDelete: Cascade, onUpdate: Restrict, map: "producto_ibfk_1")
+  categoria    Categoria?   @relation(fields: [id_categoria], references: [id_categoria], onUpdate: Restrict, map: "producto_ibfk_2")
+
+  @@index([id_categoria], map: "id_categoria")
+  @@index([id_oferente], map: "id_oferente")
+  @@map("producto")
+}
+
+model Pedido {
+  id_pedido      Int           @id @default(autoincrement())
+  id_usuario     Int
+  monto_total    Decimal       @db.Decimal(10, 2)
+  fecha_creacion DateTime?     @default(now()) @db.Timestamp(0)
+  estado         EstadoPedido? @default(pendiente)
+  metodo_pago    String?       @db.VarChar(50)
+  payment_id     String?       @db.VarChar(50)
+  id_oferente    Int?
+  items          ItemPedido[]
+  usuario        Usuario       @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade, onUpdate: Restrict, map: "pedido_ibfk_1")
+
+  @@index([id_usuario], map: "id_usuario")
+  @@map("pedido")
+}
+
+model ItemPedido {
+  id_item_pedido Int      @id @default(autoincrement())
+  id_pedido      Int
+  id_producto    Int
+  cantidad       Int
+  precio_compra  Decimal  @db.Decimal(10, 2)
+  pedido         Pedido   @relation(fields: [id_pedido], references: [id_pedido], onDelete: Cascade, onUpdate: Restrict, map: "item_pedido_ibfk_1")
+  producto       Producto @relation(fields: [id_producto], references: [id_producto], onUpdate: Restrict, map: "item_pedido_ibfk_2")
+
+  @@index([id_pedido], map: "id_pedido")
+  @@index([id_producto], map: "id_producto")
+  @@map("item_pedido")
+}
+
+model Carrito {
+  id_carrito     Int       @id @default(autoincrement())
+  id_usuario     Int
+  id_producto    Int
+  cantidad       Int?      @default(1)
+  fecha_agregado DateTime? @default(now()) @db.Timestamp(0)
+  usuario        Usuario   @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade, onUpdate: Restrict, map: "carrito_ibfk_1")
+  producto       Producto  @relation(fields: [id_producto], references: [id_producto], onDelete: Cascade, onUpdate: Restrict, map: "carrito_ibfk_2")
+
+  @@index([id_producto], map: "id_producto")
+  @@index([id_usuario], map: "id_usuario")
+  @@map("carrito")
+}
+
+model codigo_2fa {
+  id               Int       @id @default(autoincrement())
+  id_usuario       Int
+  codigo           String    @db.VarChar(6)
+  fecha_expiracion DateTime  @db.Timestamp(0)
+  usado            Boolean?  @default(false)
+  fecha_creacion   DateTime? @default(now()) @db.Timestamp(0)
+  usuario          Usuario   @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade, onUpdate: Restrict, map: "codigo_2fa_ibfk_1")
+
+  @@index([id_usuario], map: "id_usuario")
+}
+
+model reserva {
+  id_reserva           Int                  @id @default(autoincrement())
+  id_usuario           Int
+  id_servicio          Int
+  fecha                DateTime             @db.Date
+  hora                 DateTime             @db.Time(0)
+  numero_personas      Int
+  estado               reserva_estado?      @default(pendiente)
+  notas                String?              @db.Text
+  fecha_creacion       DateTime?            @default(now()) @db.Timestamp(0)
+  usuario              Usuario              @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade, onUpdate: Restrict, map: "reserva_ibfk_1")
+  servicio_restaurante servicio_restaurante @relation(fields: [id_servicio], references: [id_servicio], onDelete: Cascade, onUpdate: Restrict, map: "reserva_ibfk_2")
+
+  @@index([id_servicio], map: "id_servicio")
+  @@index([id_usuario], map: "id_usuario")
+}
+
+model servicio_restaurante {
+  id_servicio  Int       @id @default(autoincrement())
+  id_oferente  Int
+  nombre       String    @db.VarChar(100)
+  descripcion  String?   @db.Text
+  rango_precio String?   @db.VarChar(50)
+  capacidad    Int?
+  estatus      Boolean?  @default(true)
+  imagenes     String?   @db.LongText
+  reserva      reserva[]
+  oferente     Oferente  @relation(fields: [id_oferente], references: [id_oferente], onDelete: Cascade, onUpdate: Restrict, map: "servicio_restaurante_ibfk_1")
+
+  @@index([id_oferente], map: "id_oferente")
+}
+
+enum EstadoPedido {
+  pendiente
+  pagado
+  enviado
+  completado
+}
+
+enum categoria_tipo {
+  gastronomica
+  artesanal
+}
+
+enum usuario_rol {
+  turista
+  oferente
+  admin
+}
+
+enum oferente_tipo {
+  restaurante
+  artesanal
+}
+
+enum oferente_estado {
+  pendiente
+  aprobado
+  suspendido
+}
+
+enum reserva_estado {
+  pendiente
+  confirmada
+  cancelada
+}
+
+enum oferente_mp_estado {
+  pendiente
+  activo
+  rechazado
+}

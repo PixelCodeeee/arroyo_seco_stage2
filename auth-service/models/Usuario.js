@@ -120,46 +120,47 @@ class Usuario {
 
     // Stats para analíticas
     static async getStats() {
-        // Since Prisma aggregates aren't great with custom sums based on conditions easily 
-        // without groupBy, raw SQL is still best here. Prisma supports raw SQL safely.
-        const rows = await db.$queryRaw`
-            SELECT
-                SUM(1) as total_usuarios,
-                SUM(CASE WHEN rol = 'turista' THEN 1 ELSE 0 END) as turistas,
-                SUM(CASE WHEN rol = 'oferente' THEN 1 ELSE 0 END) as oferentes,
-                SUM(CASE WHEN rol = 'admin' THEN 1 ELSE 0 END) as admins,
-                SUM(CASE WHEN esta_activo = 1 THEN 1 ELSE 0 END) as activos
-            FROM usuario
-        `;
+        const total_usuarios = await db.usuario.count();
+        const turistas = await db.usuario.count({ where: { rol: 'turista' } });
+        const oferentes = await db.usuario.count({ where: { rol: 'oferente' } });
+        const admins = await db.usuario.count({ where: { rol: 'admin' } });
+        const activos = await db.usuario.count({ where: { esta_activo: true } });
         
-        // ensure numerical conversion 
-        return {
-           total_usuarios: Number(rows[0].total_usuarios),
-           turistas: Number(rows[0].turistas),
-           oferentes: Number(rows[0].oferentes),
-           admins: Number(rows[0].admins),
-           activos: Number(rows[0].activos)
-        };
+        return { total_usuarios, turistas, oferentes, admins, activos };
     }
 
     // Usuarios registrados por mes (últimos 6 meses)
     static async getRegistrosPorMes() {
-        const rows = await db.$queryRaw`
-            SELECT
-                DATE_FORMAT(fecha_creacion, '%Y-%m') as mes,
-                DATE_FORMAT(fecha_creacion, '%b %Y') as mes_label,
-                COUNT(*) as total
-            FROM usuario
-            WHERE fecha_creacion >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
-            GROUP BY DATE_FORMAT(fecha_creacion, '%Y-%m'), DATE_FORMAT(fecha_creacion, '%b %Y')
-            ORDER BY mes ASC
-        `;
-        // Convert BigInts from raw queries if necessary
-        return rows.map(r => ({
-            mes: r.mes,
-            mes_label: r.mes_label,
-            total: Number(r.total)
-        }));
+        const sixMonthsAgo = new Date();
+        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+        
+        const usuarios = await db.usuario.findMany({
+            where: { fecha_creacion: { gte: sixMonthsAgo } },
+            select: { fecha_creacion: true },
+            orderBy: { fecha_creacion: 'asc' }
+        });
+
+        const countsMap = new Map();
+        
+        for (const u of usuarios) {
+            if (!u.fecha_creacion) continue;
+            
+            const reqDate = new Date(u.fecha_creacion);
+            const year = reqDate.getFullYear();
+            const monthStr = String(reqDate.getMonth() + 1).padStart(2, '0');
+            const key = `${year}-${monthStr}`;
+            
+            if (!countsMap.has(key)) {
+                let monthLabel = new Intl.DateTimeFormat('en-US', { month: 'short' }).format(reqDate);
+                // To behave like MySQL '%b %Y' (e.g. 'Oct 2023')
+                const label = `${monthLabel} ${year}`;
+                countsMap.set(key, { mes: key, mes_label: label, total: 0 });
+            }
+            
+            countsMap.get(key).total++;
+        }
+
+        return Array.from(countsMap.values());
     }
 }
 

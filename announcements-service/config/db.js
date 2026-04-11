@@ -1,14 +1,25 @@
-const mysql = require('mysql2/promise');
+const { PrismaClient } = require('@prisma/client');
 require('dotenv').config();
 
-const db = mysql.createPool({
-    host: process.env.DB_HOST,
-    port: 3306,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME,
-    waitForConnections: true,
-    connectionLimit: 5
+console.log("DEBUG: Conectando PrismaClient en la base de datos de Announcements.");
+
+// Assemble DATABASE_URL strictly from manual env components to avoid stale .env Prisma strings, working seamlessly locally and in Docker Compose.
+if (process.env.DB_HOST) {
+    const port = process.env.DB_PORT || 3306;
+    const dbPwd = process.env.DB_PASSWORD ? `:${process.env.DB_PASSWORD}` : '';
+    process.env.DATABASE_URL = `mysql://${process.env.DB_USER}${dbPwd}@${process.env.DB_HOST}:${port}/${process.env.DB_NAME}`;
+}
+
+const prisma = new PrismaClient({
+    datasources: {
+        db: {
+            url: process.env.DATABASE_URL
+        }
+    }
 });
 
-module.exports = db;
+prisma.$connect()
+    .then(() => console.log('✓ Announcements Service Connected to MySQL database via Prisma ORM'))
+    .catch((err) => console.error('❌ Error connecting to database via Prisma:', err.message));
+
+module.exports = prisma;

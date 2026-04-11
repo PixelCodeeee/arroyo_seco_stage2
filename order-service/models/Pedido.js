@@ -1,374 +1,327 @@
-const db = require("../config/db");
+const { prisma } = require('../config/db');
 
 class Pedido {
-  // Función helper para parsear imágenes
-  static parseImagenes(imagenes) {
-    let imgs = [];
-    if (Array.isArray(imagenes)) {
-      imgs = imagenes;
-    } else if (typeof imagenes === "string") {
-      try {
-        imgs = JSON.parse(imagenes);
-      } catch {}
-    }
-    return imgs;
-  }
-
-  // Crear pedido con sus items
-  static async create(data) {
-    const connection = await db.getConnection();
-
-    try {
-      await connection.beginTransaction();
-
-      const {
-        id_usuario,
-        monto_total,
-        estado = "pendiente",
-        items = [], // Array de items: [{ id_producto, cantidad, precio_compra }]
-      } = data;
-
-      // Insertar pedido principal
-      const [result] = await connection.query(
-        `INSERT INTO pedido (id_usuario, monto_total, estado)
-                 VALUES (?, ?, ?)`,
-        [id_usuario, monto_total, estado],
-      );
-
-      const id_pedido = result.insertId;
-
-      // Insertar items del pedido
-      if (items.length > 0) {
-        const itemsValues = items.map((item) => [
-          id_pedido,
-          item.id_producto,
-          item.cantidad,
-          item.precio_compra,
-        ]);
-
-        await connection.query(
-          `INSERT INTO item_pedido (id_pedido, id_producto, cantidad, precio_compra)
-                     VALUES ?`,
-          [itemsValues],
-        );
-      }
-
-      await connection.commit();
-
-      return await this.findById(id_pedido);
-    } catch (error) {
-      await connection.rollback();
-      throw error;
-    } finally {
-      connection.release();
-    }
-  }
-
-  // Obtener todos los pedidos con información del usuario
-  static async findAll() {
-    const [rows] = await db.query(`
-            SELECT 
-                p.*,
-                u.nombre as nombre_usuario,
-                u.correo as email_usuario,
-                COUNT(ip.id_item_pedido) as total_items
-            FROM pedido p
-            LEFT JOIN usuario u ON p.id_usuario = u.id_usuario
-            LEFT JOIN item_pedido ip ON p.id_pedido = ip.id_pedido
-            GROUP BY p.id_pedido
-            ORDER BY p.id_pedido DESC
-        `);
-    return rows;
-  }
-
-  // Obtener pedido por ID con sus items
-  static async findById(id) {
-    const [pedidos] = await db.query(
-      `SELECT 
-                p.*,
-                u.nombre as nombre_usuario,
-                u.correo as email_usuario,
-                u.telefono as telefono_usuario
-            FROM pedido p
-            LEFT JOIN usuario u ON p.id_usuario = u.id_usuario
-            WHERE p.id_pedido = ?`,
-      [id],
-    );
-
-    if (!pedidos.length) return null;
-
-    const pedido = pedidos[0];
-
-    // Obtener items del pedido
-    const [items] = await db.query(
-      `SELECT 
-                ip.*,
-                prod.nombre as nombre_producto,
-                prod.descripcion as descripcion_producto,
-                prod.imagenes as imagenes_producto,
-                o.nombre_negocio as nombre_oferente
-            FROM item_pedido ip
-            LEFT JOIN producto prod ON ip.id_producto = prod.id_producto
-            LEFT JOIN oferente o ON prod.id_oferente = o.id_oferente
-            WHERE ip.id_pedido = ?`,
-      [id],
-    );
-
-    // Parse imagenes JSON
-    pedido.items = items.map((item) => ({
-      ...item,
-      imagenes_producto: this.parseImagenes(item.imagenes_producto),
-    }));
-
-    return pedido;
-  }
-
-  // Obtener pedidos por usuario
-  static async findByUsuarioId(usuarioId) {
-    const [pedidos] = await db.query(
-      `SELECT 
-                p.*,
-                COUNT(ip.id_item_pedido) as total_items
-            FROM pedido p
-            LEFT JOIN item_pedido ip ON p.id_pedido = ip.id_pedido
-            WHERE p.id_usuario = ?
-            GROUP BY p.id_pedido
-            ORDER BY p.id_pedido DESC`,
-      [usuarioId],
-    );
-
-    // Obtener items para cada pedido
-    for (let pedido of pedidos) {
-      const [items] = await db.query(
-        `SELECT 
-                    ip.*,
-                    prod.nombre as nombre_producto,
-                    prod.imagenes as imagenes_producto
-                FROM item_pedido ip
-                LEFT JOIN producto prod ON ip.id_producto = prod.id_producto
-                WHERE ip.id_pedido = ?`,
-        [pedido.id_pedido],
-      );
-
-      pedido.items = items.map((item) => ({
-        ...item,
-        imagenes_producto: this.parseImagenes(item.imagenes_producto),
-      }));
+    static parseImagenes(imagenes) {
+        if (!imagenes) return [];
+        if (Array.isArray(imagenes)) return imagenes;
+        if (typeof imagenes === "string") {
+            try { return JSON.parse(imagenes); } catch { return []; }
+        }
+        return [];
     }
 
-    return pedidos;
-  }
+    static mapPedidoFields(p) {
+        if (!p) return p;
 
-  // Obtener pedidos por oferente (para que vea sus ventas)
-  static async findByOferenteId(oferenteId) {
-    const [rows] = await db.query(
-      `SELECT DISTINCT
-                p.id_pedido,
-                p.id_usuario,
-                p.monto_total,
-                p.estado,
-                p.fecha_creacion,
-                u.nombre as nombre_usuario,
-                u.correo as email_usuario,
-                u.telefono as telefono_usuario
-            FROM pedido p
-            LEFT JOIN usuario u ON p.id_usuario = u.id_usuario
-            INNER JOIN item_pedido ip ON p.id_pedido = ip.id_pedido
-            INNER JOIN producto prod ON ip.id_producto = prod.id_producto
-            WHERE prod.id_oferente = ?
-            ORDER BY p.id_pedido DESC`,
-      [oferenteId],
-    );
+        const mapped = {
+            id_pedido: p.id_pedido,
+            id_usuario: p.id_usuario,
+            monto_total: typeof p.monto_total === 'object' && p.monto_total !== null ? Number(p.monto_total) : p.monto_total,
+            fecha_creacion: p.fecha_creacion,
+            estado: p.estado,
+            metodo_pago: p.metodo_pago,
+            nombre_usuario: p.usuario?.nombre,
+            email_usuario: p.usuario?.correo,
+            total_items: p.items ? p.items.length : 0,
+            items: p.items ? p.items.map(ip => ({
+                id_item_pedido: ip.id_item_pedido,
+                id_pedido: ip.id_pedido,
+                id_producto: ip.id_producto,
+                cantidad: ip.cantidad,
+                precio_compra: typeof ip.precio_compra === 'object' && ip.precio_compra !== null ? Number(ip.precio_compra) : ip.precio_compra,
+                nombre_producto: ip.producto?.nombre,
+                descripcion_producto: ip.producto?.descripcion,
+                imagenes_producto: this.parseImagenes(ip.producto?.imagenes),
+                nombre_oferente: ip.producto?.oferente?.nombre_negocio
+            })) : []
+        };
 
-    // Obtener items de cada pedido que pertenezcan al oferente
-    for (let pedido of rows) {
-      const [items] = await db.query(
-        `SELECT 
-                    ip.*,
-                    prod.nombre as nombre_producto,
-                    prod.imagenes as imagenes_producto
-                FROM item_pedido ip
-                LEFT JOIN producto prod ON ip.id_producto = prod.id_producto
-                WHERE ip.id_pedido = ? AND prod.id_oferente = ?`,
-        [pedido.id_pedido, oferenteId],
-      );
-
-      pedido.items = items.map((item) => ({
-        ...item,
-        imagenes_producto: this.parseImagenes(item.imagenes_producto),
-      }));
+        return mapped;
     }
 
-    return rows;
-  }
-
-  // Obtener pedidos por estado
-  static async findByEstado(estado) {
-    const [rows] = await db.query(
-      `SELECT 
-                p.*,
-                u.nombre as nombre_usuario,
-                u.correo as email_usuario,
-                COUNT(ip.id_item_pedido) as total_items
-            FROM pedido p
-            LEFT JOIN usuario u ON p.id_usuario = u.id_usuario
-            LEFT JOIN item_pedido ip ON p.id_pedido = ip.id_pedido
-            WHERE p.estado = ?
-            GROUP BY p.id_pedido
-            ORDER BY p.id_pedido DESC`,
-      [estado],
-    );
-    return rows;
-  }
-
-  // Actualizar estado del pedido
-  static async updateEstado(id, estado) {
-    const [result] = await db.query(
-      `UPDATE pedido SET estado = ? WHERE id_pedido = ?`,
-      [estado, id],
-    );
-
-    if (result.affectedRows === 0) return null;
-    return await this.findById(id);
-  }
-
-  // Eliminar pedido (solo si está en estado pendiente)
-  static async delete(id) {
-    const connection = await db.getConnection();
-
-    try {
-      await connection.beginTransaction();
-
-      // Verificar que el pedido exista y esté en estado pendiente
-      const [pedidos] = await connection.query(
-        "SELECT estado FROM pedido WHERE id_pedido = ?",
-        [id],
-      );
-
-      if (pedidos.length === 0) {
-        throw new Error("Pedido no encontrado");
-      }
-
-      if (pedidos[0].estado !== "pendiente") {
-        throw new Error("Solo se pueden eliminar pedidos en estado pendiente");
-      }
-
-      // Eliminar items del pedido
-      await connection.query("DELETE FROM item_pedido WHERE id_pedido = ?", [
-        id,
-      ]);
-
-      // Eliminar pedido
-      const [result] = await connection.query(
-        "DELETE FROM pedido WHERE id_pedido = ?",
-        [id],
-      );
-
-      await connection.commit();
-      return result.affectedRows > 0;
-    } catch (error) {
-      await connection.rollback();
-      throw error;
-    } finally {
-      connection.release();
+    static getIncludes() {
+        return {
+            usuario: { select: { nombre: true, correo: true } },
+            items: {
+                include: {
+                    producto: {
+                        include: {
+                            oferente: { select: { nombre_negocio: true } }
+                        }
+                    }
+                }
+            }
+        };
     }
-  }
 
-  // Estadísticas de pedidos
-  static async getStats() {
-    const [rows] = await db.query(`
-            SELECT 
-                COUNT(*) as total,
-                SUM(CASE WHEN estado = 'pendiente' THEN 1 ELSE 0 END) as pendientes,
-                SUM(CASE WHEN estado = 'pagado' THEN 1 ELSE 0 END) as pagados,
-                SUM(CASE WHEN estado = 'enviado' THEN 1 ELSE 0 END) as enviados,
-                SUM(monto_total) as ventas_totales,
-                AVG(monto_total) as ticket_promedio
-            FROM pedido
-        `);
-    return rows[0];
-  }
+    static async create(data) {
+        const { id_usuario, monto_total, estado = 'pendiente', items = [] } = data;
 
-  // Estadísticas por oferente
-  static async getStatsByOferente(oferenteId) {
-    const [rows] = await db.query(
-      `
-            SELECT 
-                COUNT(DISTINCT p.id_pedido) as total_pedidos,
-                SUM(ip.cantidad) as total_productos_vendidos,
-                SUM(ip.cantidad * ip.precio_compra) as ventas_totales
-            FROM pedido p
-            INNER JOIN item_pedido ip ON p.id_pedido = ip.id_pedido
-            INNER JOIN producto prod ON ip.id_producto = prod.id_producto
-            WHERE prod.id_oferente = ? AND p.estado = 'pagado'`,
-      [oferenteId],
-    );
-    return rows[0];
-  }
+        const pedido = await prisma.pedido.create({
+            data: {
+                id_usuario: parseInt(id_usuario, 10),
+                monto_total: parseFloat(monto_total),
+                estado: estado,
+                items: {
+                    create: items.map(item => ({
+                        id_producto: parseInt(item.id_producto, 10),
+                        cantidad: parseInt(item.cantidad, 10),
+                        precio_compra: parseFloat(item.precio_compra)
+                    }))
+                }
+            },
+            include: this.getIncludes()
+        });
 
-  // Top productos mas vendidos (para recomendaciones)
-  static async getTopProductos(limit = 10) {
-    const [rows] = await db.query(
-      `
-            SELECT
-                prod.id_producto,
-                prod.nombre as nombre_producto,
-                prod.descripcion,
-                prod.imagenes,
-                prod.precio,
-                o.id_oferente,
-                o.nombre_negocio,
-                o.tipo as tipo_oferente,
-                SUM(ip.cantidad) as total_vendido,
-                COUNT(DISTINCT p.id_usuario) as total_compradores
-            FROM item_pedido ip
-            INNER JOIN pedido p ON ip.id_pedido = p.id_pedido
-            INNER JOIN producto prod ON ip.id_producto = prod.id_producto
-            INNER JOIN oferente o ON prod.id_oferente = o.id_oferente
-            WHERE p.estado IN ('pagado', 'enviado', 'completado')
-            AND p.fecha_creacion >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-            GROUP BY prod.id_producto
-            ORDER BY total_vendido DESC
-            LIMIT ?
-        `,
-      [limit],
-    );
+        return this.mapPedidoFields(pedido);
+    }
 
-    return rows.map((row) => ({
-      ...row,
-      imagenes: this.parseImagenes(row.imagenes),
-    }));
-  }
+    static async findAll() {
+        const pedidos = await prisma.pedido.findMany({
+            include: this.getIncludes(),
+            orderBy: { id_pedido: 'desc' }
+        });
+        return pedidos.map(p => this.mapPedidoFields(p));
+    }
 
-  // Stats completos para analíticas
-  static async getStatsAnaliticas() {
-    const [ventas] = await db.query(`
-        SELECT
-            COUNT(*) as total_pedidos,
-            SUM(CASE WHEN estado = 'pagado' OR estado = 'completado' THEN monto_total ELSE 0 END) as ingresos_totales,
-            SUM(CASE WHEN estado = 'pendiente' THEN 1 ELSE 0 END) as pendientes,
-            SUM(CASE WHEN estado = 'pagado' THEN 1 ELSE 0 END) as pagados,
-            SUM(CASE WHEN estado = 'enviado' THEN 1 ELSE 0 END) as enviados,
-            SUM(CASE WHEN estado = 'completado' THEN 1 ELSE 0 END) as completados
-        FROM pedido
-        WHERE fecha_creacion >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-    `);
+    static async findById(id) {
+        const pedido = await prisma.pedido.findUnique({
+            where: { id_pedido: parseInt(id, 10) },
+            include: this.getIncludes()
+        });
+        return pedido ? this.mapPedidoFields(pedido) : null;
+    }
 
-    const [ventasPorMes] = await db.query(`
-    SELECT
-        DATE_FORMAT(fecha_creacion, '%Y-%m') as mes,
-        DATE_FORMAT(fecha_creacion, '%b %Y') as mes_label,
-        COUNT(*) as total_pedidos,
-        SUM(monto_total) as ingresos
-    FROM pedido
-    WHERE estado IN ('pagado', 'completado')
-    AND fecha_creacion >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
-    GROUP BY DATE_FORMAT(fecha_creacion, '%Y-%m'), DATE_FORMAT(fecha_creacion, '%b %Y')
-    ORDER BY mes ASC
-`);
+    static async findByUsuarioId(usuarioId) {
+        const pedidos = await prisma.pedido.findMany({
+            where: { id_usuario: parseInt(usuarioId, 10) },
+            include: this.getIncludes(),
+            orderBy: { id_pedido: 'desc' }
+        });
+        return pedidos.map(p => this.mapPedidoFields(p));
+    }
 
-    return { ...ventas[0], ventasPorMes };
-  }
+    static async findByOferenteId(oferenteId) {
+        const pedidos = await prisma.pedido.findMany({
+            where: {
+                items: {
+                    some: {
+                        producto: {
+                            id_oferente: parseInt(oferenteId, 10)
+                        }
+                    }
+                }
+            },
+            include: this.getIncludes(),
+            orderBy: { id_pedido: 'desc' }
+        });
+
+        return pedidos.map(p => {
+            const mapped = this.mapPedidoFields(p);
+            mapped.items = mapped.items.filter(item =>
+                p.items.find(pi => pi.id_item_pedido === item.id_item_pedido)?.producto?.id_oferente === parseInt(oferenteId, 10)
+            );
+            return mapped;
+        });
+    }
+
+    static async findByEstado(estado) {
+        const pedidos = await prisma.pedido.findMany({
+            where: { estado },
+            include: this.getIncludes(),
+            orderBy: { id_pedido: 'desc' }
+        });
+        return pedidos.map(p => this.mapPedidoFields(p));
+    }
+
+    static async updateEstado(id, estado) {
+        const pedido = await prisma.pedido.update({
+            where: { id_pedido: parseInt(id, 10) },
+            data: { estado },
+            include: this.getIncludes()
+        });
+        return this.mapPedidoFields(pedido);
+    }
+
+    static async delete(id) {
+        try {
+            const pedido = await prisma.pedido.findUnique({
+                where: { id_pedido: parseInt(id, 10) },
+                select: { estado: true }
+            });
+
+            if (!pedido) throw new Error("Pedido no encontrado");
+            if (pedido.estado !== "pendiente") throw new Error("Solo se pueden eliminar pedidos en estado pendiente");
+
+            await prisma.pedido.delete({
+                where: { id_pedido: parseInt(id, 10) }
+            });
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    static async getStats() {
+        const total = await prisma.pedido.count();
+        const pendientes = await prisma.pedido.count({ where: { estado: 'pendiente' } });
+        const pagados = await prisma.pedido.count({ where: { estado: 'pagado' } });
+        const enviados = await prisma.pedido.count({ where: { estado: 'enviado' } });
+
+        const aggregate = await prisma.pedido.aggregate({
+            _sum: { monto_total: true },
+            _avg: { monto_total: true }
+        });
+
+        return {
+            total,
+            pendientes,
+            pagados,
+            enviados,
+            ventas_totales: aggregate._sum.monto_total ? Number(aggregate._sum.monto_total) : 0,
+            ticket_promedio: aggregate._avg.monto_total ? Number(aggregate._avg.monto_total) : 0
+        };
+    }
+
+    static async getStatsByOferente(oferenteId) {
+        const items = await prisma.item_pedido.findMany({
+            where: {
+                producto: { id_oferente: parseInt(oferenteId, 10) },
+                pedido: { estado: 'pagado' }
+            },
+            select: {
+                id_pedido: true,
+                cantidad: true,
+                precio_compra: true
+            }
+        });
+
+        const uniquePedidos = new Set(items.map(item => item.id_pedido));
+
+        let total_productos_vendidos = 0;
+        let ventas_totales = 0;
+        for (const item of items) {
+            total_productos_vendidos += item.cantidad;
+            ventas_totales += item.cantidad * Number(item.precio_compra);
+        }
+
+        return {
+            total_pedidos: uniquePedidos.size,
+            total_productos_vendidos,
+            ventas_totales
+        };
+    }
+
+    static async getTopProductos(limit = 10) {
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+        const items = await prisma.item_pedido.findMany({
+            where: {
+                pedido: {
+                    estado: { in: ['pagado', 'enviado', 'completado'] },
+                    fecha_creacion: { gte: thirtyDaysAgo }
+                }
+            },
+            include: {
+                pedido: { select: { id_usuario: true } },
+                producto: { include: { oferente: true } }
+            }
+        });
+
+        const prodStats = new Map();
+        for (const ip of items) {
+            if (!ip.producto) continue;
+
+            const pid = ip.id_producto;
+            if (!prodStats.has(pid)) {
+                prodStats.set(pid, {
+                    id_producto: pid,
+                    nombre_producto: ip.producto.nombre,
+                    descripcion: ip.producto.descripcion,
+                    imagenes: this.parseImagenes(ip.producto.imagenes),
+                    precio: Number(ip.producto.precio),
+                    id_oferente: ip.producto.oferente?.id_oferente || null,
+                    nombre_negocio: ip.producto.oferente?.nombre_negocio || null,
+                    tipo_oferente: ip.producto.oferente?.tipo || null,
+                    total_vendido: 0,
+                    usuarios_set: new Set()
+                });
+            }
+            const stat = prodStats.get(pid);
+            stat.total_vendido += ip.cantidad;
+            stat.usuarios_set.add(ip.pedido.id_usuario);
+        }
+
+        return Array.from(prodStats.values())
+            .sort((a, b) => b.total_vendido - a.total_vendido)
+            .slice(0, parseInt(limit, 10))
+            .map(s => {
+                const { usuarios_set, ...rest } = s;
+                rest.total_compradores = usuarios_set.size;
+                return rest;
+            });
+    }
+
+    static async getStatsAnaliticas() {
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+        const recientes = await prisma.pedido.findMany({
+            where: { fecha_creacion: { gte: thirtyDaysAgo } },
+            select: { estado: true, monto_total: true }
+        });
+
+        let ingresos_totales = 0;
+        let pendientes = 0, pagados = 0, enviados = 0, completados = 0;
+
+        for (const p of recientes) {
+            if (p.estado === 'pendiente') pendientes++;
+            if (p.estado === 'pagado') pagados++;
+            if (p.estado === 'enviado') enviados++;
+            if (p.estado === 'completado') completados++;
+            if (p.estado === 'pagado' || p.estado === 'completado') ingresos_totales += Number(p.monto_total);
+        }
+
+        const sixMonthsAgo = new Date();
+        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+        const pedidosHistoricos = await prisma.pedido.findMany({
+            where: { estado: { in: ['pagado', 'completado'] }, fecha_creacion: { gte: sixMonthsAgo } },
+            select: { fecha_creacion: true, monto_total: true }
+        });
+
+        const countsMap = new Map();
+        for (const p of pedidosHistoricos) {
+            if (!p.fecha_creacion) continue;
+
+            const reqDate = new Date(p.fecha_creacion);
+            const year = reqDate.getFullYear();
+            const monthStr = String(reqDate.getMonth() + 1).padStart(2, '0');
+            const key = `${year}-${monthStr}`;
+
+            if (!countsMap.has(key)) {
+                let monthLabel = new Intl.DateTimeFormat('en-US', { month: 'short' }).format(reqDate);
+                const label = `${monthLabel} ${year}`;
+                countsMap.set(key, { mes: key, mes_label: label, total_pedidos: 0, ingresos: 0 });
+            }
+
+            const mapStat = countsMap.get(key);
+            mapStat.total_pedidos++;
+            mapStat.ingresos += Number(p.monto_total);
+        }
+
+        const ventasPorMes = Array.from(countsMap.values()).sort((a, b) => a.mes.localeCompare(b.mes));
+
+        return {
+            total_pedidos: recientes.length,
+            ingresos_totales,
+            pendientes,
+            pagados,
+            enviados,
+            completados,
+            ventasPorMes
+        };
+    }
 }
 
 module.exports = Pedido;

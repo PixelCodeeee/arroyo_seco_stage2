@@ -11,7 +11,7 @@ exports.crearServicio = async (req, res) => {
             rango_precio,
             capacidad,
             imagenes,
-            estatus = 1
+            estatus = true
         } = req.body;
 
         if (!id_oferente || !nombre) {

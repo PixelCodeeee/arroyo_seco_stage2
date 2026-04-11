@@ -27,6 +27,7 @@ services:
     build: ./auth-service
     restart: always
     environment:
+      - NODE_ENV=production
       - DB_HOST=10.223.32.3 # Cloud SQL Private IP
       - DB_USER=db_user
       - DB_PASSWORD=arroyo_password
@@ -38,6 +39,7 @@ services:
     build: ./catalog-service
     restart: always
     environment:
+      - NODE_ENV=production
       - DB_HOST=10.223.32.3 # Cloud SQL Private IP
       - DB_USER=db_user
       - DB_PASSWORD=arroyo_password
@@ -49,6 +51,7 @@ services:
     build: ./order-service
     restart: always
     environment:
+      - NODE_ENV=production
       - DB_HOST=10.223.32.3 # Cloud SQL Private IP
       - DB_USER=db_user
       - DB_PASSWORD=arroyo_password
@@ -60,6 +63,7 @@ services:
     build: ./reservation-service
     restart: always
     environment:
+      - NODE_ENV=production
       - DB_HOST=10.223.32.3 # Cloud SQL Private IP
       - DB_USER=db_user
       - DB_PASSWORD=arroyo_password
@@ -71,6 +75,7 @@ services:
     build: ./payment-service
     restart: always
     environment:
+      - NODE_ENV=production
       - DB_HOST=10.223.32.3 # Cloud SQL Private IP
       - DB_USER=db_user
       - DB_PASSWORD=arroyo_password
@@ -82,6 +87,7 @@ services:
     build: ./announcements-service
     restart: always
     environment:
+      - NODE_ENV=production
       - DB_HOST=10.223.32.3 # Cloud SQL Private IP
       - DB_USER=db_user
       - DB_PASSWORD=arroyo_password

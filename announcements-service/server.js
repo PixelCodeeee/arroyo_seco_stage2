@@ -2,96 +2,96 @@ const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
 
-const db = require('./config/db');
+const prisma = require('./config/db');
 
 const app = express();
-app.use(cors());
+const allowedOrigins = process.env.NODE_ENV === 'production' ? ['https://arroyoseco.online'] : ['https://arroyoseco.online', 'http://localhost:5173'];
+const corsOptions = {
+    origin: process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : allowedOrigins,
+    optionsSuccessStatus: 200
+};
+app.use(cors(corsOptions));
 app.use(express.json());
 
 const PORT = process.env.PORT || 5006;
 
-async function initDB() {
+app.get('/api/announcements', async (req, res) => {
     try {
-        await db.query(`
-            CREATE TABLE IF NOT EXISTS announcements (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                title VARCHAR(255) NOT NULL,
-                description TEXT NOT NULL,
-                image_url VARCHAR(500),
-                event_date DATE,
-                is_active BOOLEAN DEFAULT TRUE,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        `);
-        console.log('✓ Announcements table ready');
-    } catch (error) {
-        console.error('❌ Error initializing database:', error);
-    }
-}
-
-app.get('/announcements', async (req, res) => {
-    try {
-        const [rows] = await db.query(
-            'SELECT * FROM announcements WHERE is_active = TRUE ORDER BY event_date ASC'
-        );
+        const rows = await prisma.announcements.findMany({
+            where: { is_active: true },
+            orderBy: { event_date: 'asc' }
+        });
         res.json(rows);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
-app.get('/announcements/:id', async (req, res) => {
+app.get('/api/announcements/:id', async (req, res) => {
     try {
-        const [rows] = await db.query(
-            'SELECT * FROM announcements WHERE id = ?',
-            [req.params.id]
-        );
-        if (rows.length === 0) {
+        const row = await prisma.announcements.findUnique({
+            where: { id: parseInt(req.params.id, 10) }
+        });
+        if (!row) {
             return res.status(404).json({ message: 'Announcement not found' });
         }
-        res.json(rows[0]);
+        res.json(row);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
-app.post('/announcements', async (req, res) => {
+app.post('/api/announcements', async (req, res) => {
     try {
         const { title, description, image_url, event_date } = req.body;
-        const [result] = await db.query(
-            `INSERT INTO announcements (title, description, image_url, event_date)
-             VALUES (?, ?, ?, ?)`,
-            [title, description, image_url, event_date]
-        );
-        res.status(201).json({ message: 'Announcement created', id: result.insertId });
+        const result = await prisma.announcements.create({
+            data: {
+                title,
+                description,
+                image_url,
+                event_date: event_date ? new Date(event_date) : null
+            }
+        });
+        res.status(201).json({ message: 'Announcement created', id: result.id });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
-app.put('/announcements/:id', async (req, res) => {
+app.put('/api/announcements/:id', async (req, res) => {
     try {
         const { title, description, image_url, event_date, is_active } = req.body;
-        await db.query(
-            `UPDATE announcements SET title = ?, description = ?, image_url = ?, event_date = ?, is_active = ? WHERE id = ?`,
-            [title, description, image_url, event_date, is_active, req.params.id]
-        );
+        await prisma.announcements.update({
+            where: { id: parseInt(req.params.id, 10) },
+            data: {
+                title,
+                description,
+                image_url,
+                event_date: event_date ? new Date(event_date) : null,
+                is_active: is_active !== undefined ? is_active : true
+            }
+        });
         res.json({ message: 'Announcement updated' });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
-app.delete('/announcements/:id', async (req, res) => {
+app.delete('/api/announcements/:id', async (req, res) => {
     try {
-        await db.query('DELETE FROM announcements WHERE id = ?', [req.params.id]);
+        await prisma.announcements.delete({
+            where: { id: parseInt(req.params.id, 10) }
+        });
         res.json({ message: 'Announcement deleted' });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
-app.listen(PORT, async () => {
+// Error handling middleware
+const prismaErrorHandler = require('./middleware/prismaErrorHandler');
+app.use(prismaErrorHandler);
+
+app.listen(PORT, () => {
     console.log(`🚀 Announcements Service running on port ${PORT}`);
-    await initDB();
 });

@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const db = require('../config/db');
+const { prisma } = require('../config/db');
 
 // Verify if user is authenticated
 const verifyToken = (req, res, next) => {
@@ -47,10 +47,9 @@ const verifyoferente = async (req, res, next) => {
         }
 
         // Get oferente info from database
-        const [oferentes] = await db.query(
-            'SELECT * FROM oferente WHERE id_usuario = ?',
-            [decoded.id]
-        );
+        const oferentes = await prisma.oferente.findMany({
+            where: { id_usuario: decoded.id }
+        });
 
         if (oferentes.length === 0) {
             return res.status(404).json({

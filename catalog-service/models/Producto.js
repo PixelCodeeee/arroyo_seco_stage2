@@ -1,10 +1,10 @@
-const db = require('../config/db');
+const { prisma } = require('../config/db');
 
 class Producto {
 
     static parseImagenes(p) {
+        if (!p) return p;
         let imgs = [];
-
         if (Array.isArray(p.imagenes)) {
             imgs = p.imagenes;
         } else if (typeof p.imagenes === "string") {
@@ -15,114 +15,108 @@ class Producto {
                 imgs = [];
             }
         }
-
         return { ...p, imagenes: imgs };
     }
 
+    static mapCategoriaFields(producto) {
+        if (!producto) return producto;
+        const { categoria, ...rest } = producto;
+        return Producto.parseImagenes({
+            ...rest,
+            precio: typeof rest.precio === 'object' && rest.precio !== null ? Number(rest.precio) : rest.precio,
+            nombre_categoria: categoria?.nombre,
+            tipo_categoria: categoria?.tipo
+        });
+    }
 
     static async create(data) {
-        const {
-            id_oferente,
-            nombre,
-            descripcion,
-            precio,
-            inventario = 0,
-            imagenes = [],
-            estatus = 1,
-            id_categoria
-        } = data;
+        const { id_oferente, nombre, descripcion, precio, inventario = 0, imagenes = [], estatus = true, id_categoria } = data;
 
-        const imagenesJSON = imagenes && imagenes.length > 0
-            ? JSON.stringify(imagenes)
-            : null;
-
-        const [result] = await db.query(
-            `INSERT INTO producto 
-      (id_oferente, nombre, descripcion, precio, inventario, imagenes, estatus, id_categoria)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            [
-                id_oferente,
+        const producto = await prisma.producto.create({
+            data: {
+                id_oferente: parseInt(id_oferente, 10),
                 nombre,
-                descripcion || null,
-                precio,
-                inventario,
-                imagenesJSON,
-                estatus,
-                id_categoria
-            ]
-        );
+                descripcion: descripcion || null,
+                precio: parseFloat(precio || 0),
+                inventario: parseInt(inventario, 10),
+                imagenes: imagenes && imagenes.length > 0
+                    ? JSON.stringify(imagenes)
+                    : null,
+                estatus: Boolean(estatus),
+                id_categoria: id_categoria ? parseInt(id_categoria, 10) : null
+            },
+            include: { categoria: { select: { nombre: true, tipo: true } } }
+        });
 
-        return this.findById(result.insertId);
+        return this.mapCategoriaFields(producto);
     }
 
     static async findAll() {
-        const [rows] = await db.query(`
-      SELECT p.*, c.nombre as nombre_categoria, c.tipo as tipo_categoria
-      FROM producto p
-      LEFT JOIN categoria c ON p.id_categoria = c.id_categoria
-      ORDER BY p.id_producto DESC
-    `);
-        return rows.map(this.parseImagenes);
+        const productos = await prisma.producto.findMany({
+            include: { categoria: { select: { nombre: true, tipo: true } } },
+            orderBy: { id_producto: 'desc' }
+        });
+        return productos.map(p => this.mapCategoriaFields(p));
     }
 
     static async findById(id) {
-        const [rows] = await db.query(`
-      SELECT p.*, c.nombre as nombre_categoria, c.tipo as tipo_categoria
-      FROM producto p
-      LEFT JOIN categoria c ON p.id_categoria = c.id_categoria
-      WHERE p.id_producto = ?
-    `, [id]);
-
-        return rows.length ? this.parseImagenes(rows[0]) : null;
+        const producto = await prisma.producto.findUnique({
+            where: { id_producto: parseInt(id, 10) },
+            include: { categoria: { select: { nombre: true, tipo: true } } }
+        });
+        return producto ? this.mapCategoriaFields(producto) : null;
     }
 
     static async findByOferente(id_oferente) {
-        const [rows] = await db.query(`
-      SELECT p.*, c.nombre as nombre_categoria, c.tipo as tipo_categoria
-      FROM producto p
-      LEFT JOIN categoria c ON p.id_categoria = c.id_categoria
-      WHERE p.id_oferente = ?
-      ORDER BY p.id_producto DESC
-    `, [id_oferente]);
+        const productos = await prisma.producto.findMany({
+            where: {
+                id_oferente: parseInt(id_oferente, 10), // ✅ FIXED
+                estatus: true
+            },
+            include: {
+                categoria: {
+                    select: { nombre: true, tipo: true }
+                }
+            }
+        });
 
-        return rows.map(this.parseImagenes);
+        return productos.map(p => this.mapCategoriaFields(p));
     }
 
     static async update(id, data) {
-        const fields = [];
-        const values = [];
-
-        if (data.nombre !== undefined) { fields.push('nombre = ?'); values.push(data.nombre); }
-        if (data.descripcion !== undefined) { fields.push('descripcion = ?'); values.push(data.descripcion); }
-        if (data.precio !== undefined) { fields.push('precio = ?'); values.push(data.precio); }
-        if (data.inventario !== undefined) { fields.push('inventario = ?'); values.push(data.inventario); }
-        if (data.estatus !== undefined) { fields.push('estatus = ?'); values.push(data.estatus ? 1 : 0); }
-        if (data.id_categoria !== undefined) { fields.push('id_categoria = ?'); values.push(data.id_categoria); }
+        const updateData = {};
+        if (data.nombre !== undefined) updateData.nombre = data.nombre;
+        if (data.descripcion !== undefined) updateData.descripcion = data.descripcion;
+        if (data.precio !== undefined) updateData.precio = parseFloat(data.precio);
+        if (data.inventario !== undefined) updateData.inventario = parseInt(data.inventario, 10);
+        if (data.estatus !== undefined) updateData.estatus = data.estatus === true || data.estatus === 'true';
+        if (data.id_categoria !== undefined) updateData.id_categoria = data.id_categoria ? parseInt(data.id_categoria, 10) : null;
 
         if (data.imagenes !== undefined) {
-            const json = data.imagenes.length > 0 ? JSON.stringify(data.imagenes) : null;
-            fields.push('imagenes = ?');
-            values.push(json);
+            updateData.imagenes = data.imagenes && data.imagenes.length > 0
+                ? JSON.stringify(data.imagenes)
+                : null;
         }
+        if (Object.keys(updateData).length === 0) return await this.findById(id);
 
-        if (fields.length === 0) return this.findById(id);
+        const producto = await prisma.producto.update({
+            where: { id_producto: parseInt(id, 10) },
+            data: updateData,
+            include: { categoria: { select: { nombre: true, tipo: true } } }
+        });
 
-        values.push(id);
-
-        await db.query(
-            `UPDATE producto SET ${fields.join(', ')} WHERE id_producto = ?`,
-            values
-        );
-
-        return this.findById(id);
+        return this.mapCategoriaFields(producto);
     }
 
     static async delete(id) {
-        const [result] = await db.query(
-            `DELETE FROM producto WHERE id_producto = ?`,
-            [id]
-        );
-        return result.affectedRows > 0;
+        try {
+            await prisma.producto.delete({
+                where: { id_producto: parseInt(id, 10) }
+            });
+            return true;
+        } catch {
+            return false;
+        }
     }
 }
 

@@ -44,6 +44,10 @@ CREATE TABLE IF NOT EXISTS oferente (
     horario_disponibilidad JSON,
     imagen VARCHAR(255),
     telefono VARCHAR(20),
+    mp_user_id VARCHAR(255),
+    mp_access_token VARCHAR(255),
+    mp_refresh_token VARCHAR(255),
+    mp_estado BOOLEAN DEFAULT FALSE,
     FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario) ON DELETE CASCADE
 );
 
@@ -83,6 +87,7 @@ CREATE TABLE IF NOT EXISTS pedido (
     fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     estado ENUM('pendiente', 'pagado', 'enviado', 'completado') DEFAULT 'pendiente',
     metodo_pago VARCHAR(50),
+    payment_id VARCHAR(255),
     FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario) ON DELETE CASCADE
 );
 

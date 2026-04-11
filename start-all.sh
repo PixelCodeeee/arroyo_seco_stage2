@@ -25,5 +25,9 @@ echo "Starting API Gateway..."
 cd api-gateway && npm start &
 #cd microservices/api-gateway && npm start &
 
+echo "Starting Announcements Service..."
+cd announcements-service && npm start &
+#cd microservices/announcements-service && npm start &
+
 echo "All services started!"
 wait

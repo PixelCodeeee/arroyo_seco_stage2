@@ -11,8 +11,9 @@ const PORT = process.env.PORT || 5000;
 
 app.set('trust proxy', 1);
 
+const allowedOriginsEnv = process.env.NODE_ENV === 'production' ? ['https://arroyoseco.online'] : ['https://arroyoseco.online', 'http://localhost:5173'];
 const corsOptions = {
-    origin: process.env.FRONTEND_URL || 'https://arroyoseco.online',
+    origin: process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : allowedOriginsEnv,
     optionsSuccessStatus: 200
 };
 app.use(cors(corsOptions));
@@ -95,11 +96,14 @@ app.use('/api/pedidos', proxy(ORDER_SERVICE, commonProxyOptions));
 app.use('/api/carrito', proxy(ORDER_SERVICE, commonProxyOptions));
 app.use('/api/reservas', proxy(RESERVATION_SERVICE, commonProxyOptions));
 
-app.use('/api/paypal', proxy(PAYMENT_SERVICE, {
+app.use('/api/mercadopago', proxy(PAYMENT_SERVICE, {
     ...commonProxyOptions,
     userResHeaderDecorator(headers, userReq, userRes, proxyReq, proxyRes) {
         // Explicitly set CORS headers to ensure they are present and singular
-        headers['access-control-allow-origin'] = process.env.FRONTEND_URL || 'https://arroyoseco.online';
+        const checkOrigins = process.env.NODE_ENV === 'production' ? ['https://arroyoseco.online'] : ['https://arroyoseco.online', 'http://localhost:5173'];
+        const allowedOrigins = process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : checkOrigins;
+        const reqOrigin = userReq.headers.origin;
+        headers['access-control-allow-origin'] = allowedOrigins.includes(reqOrigin) ? reqOrigin : (process.env.FRONTEND_URL || 'https://arroyoseco.online');
         headers['access-control-allow-methods'] = 'GET, POST, PUT, DELETE, OPTIONS';
         headers['access-control-allow-headers'] = 'Content-Type, Authorization';
         return headers;

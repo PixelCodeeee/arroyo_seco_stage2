@@ -1,231 +1,210 @@
-const db = require('../config/db');
+const { prisma } = require('../config/db');
 
 class Carrito {
-    // Obtener carrito de un usuario con todos los detalles de productos
-    static async findByUsuario(id_usuario) {
-        const query = `
-      SELECT 
-        c.id_carrito,
-        c.id_producto,
-        c.cantidad,
-        c.fecha_agregado,
-        p.nombre,
-        p.descripcion,
-        p.precio,
-        p.inventario,
-        p.imagenes,
-        p.esta_disponible,
-        o.nombre_negocio,
-        o.id_oferente,
-        cat.nombre as categoria_nombre
-      FROM CARRITO c
-      INNER JOIN producto p ON c.id_producto = p.id_producto
-      INNER JOIN oferente o ON p.id_oferente = o.id_oferente
-      LEFT JOIN categoria cat ON p.id_categoria = cat.id_categoria
-      WHERE c.id_usuario = ?
-      ORDER BY c.fecha_agregado DESC
-    `;
+    static parseImagenes(imagenes) {
+        if (!imagenes) return [];
+        if (Array.isArray(imagenes)) return imagenes;
+        if (typeof imagenes === "string") {
+            try { return JSON.parse(imagenes); } catch { return []; }
+        }
+        return [];
+    }
 
-        // Note: Table name case sensitivity might depend on OS/DB settings. Using 'CARRITO' or 'carrito' should match initialized table.
-
-        const [items] = await db.query(query, [id_usuario]);
-
-        return items.map(item => ({
-            ...item,
-            imagenes: item.imagenes ? JSON.parse(item.imagenes) : [],
-            subtotal: parseFloat(item.precio) * item.cantidad
+    static mapCarritoItems(items) {
+        return items.map(c => ({
+            id_carrito: c.id_carrito,
+            id_producto: c.id_producto,
+            cantidad: c.cantidad,
+            fecha_agregado: c.fecha_agregado,
+            nombre: c.producto?.nombre,
+            descripcion: c.producto?.descripcion,
+            precio: typeof c.producto?.precio === 'object' && c.producto?.precio !== null ? Number(c.producto.precio) : c.producto?.precio,
+            inventario: c.producto?.inventario,
+            imagenes: this.parseImagenes(c.producto?.imagenes),
+            estatus: c.producto?.estatus,
+            nombre_negocio: c.producto?.oferente?.nombre_negocio,
+            id_oferente: c.producto?.oferente?.id_oferente,
+            categoria_nombre: c.producto?.categoria?.nombre,
+            subtotal: (typeof c.producto?.precio === 'object' && c.producto?.precio !== null ? Number(c.producto.precio) : c.producto?.precio) * c.cantidad
         }));
     }
 
-    // Agregar producto al carrito
+    static async findByUsuario(id_usuario) {
+        const items = await prisma.carrito.findMany({
+            where: { id_usuario: parseInt(id_usuario, 10) },
+            include: {
+                producto: {
+                    include: {
+                        oferente: { select: { id_oferente: true, nombre_negocio: true } },
+                        categoria: { select: { nombre: true } }
+                    }
+                }
+            },
+            orderBy: { fecha_agregado: 'desc' }
+        });
+
+        return this.mapCarritoItems(items);
+    }
+
     static async addItem(id_usuario, id_producto, cantidad = 1) {
-        // Verificar si el producto ya está en el carrito
-        const checkQuery = `
-      SELECT id_carrito, cantidad 
-      FROM CARRITO 
-      WHERE id_usuario = ? AND id_producto = ?
-    `;
+        const existing = await prisma.carrito.findFirst({
+            where: {
+                id_usuario: parseInt(id_usuario, 10),
+                id_producto: parseInt(id_producto, 10)
+            }
+        });
 
-        const [existing] = await db.query(checkQuery, [id_usuario, id_producto]);
-
-        if (existing.length > 0) {
-            // Si ya existe, actualizar cantidad
-            const nuevaCantidad = existing[0].cantidad + cantidad;
-            const updateQuery = `
-        UPDATE CARRITO 
-        SET cantidad = ? 
-        WHERE id_carrito = ?
-      `;
-
-            await db.query(updateQuery, [nuevaCantidad, existing[0].id_carrito]);
-            return existing[0].id_carrito;
+        if (existing) {
+            const result = await prisma.carrito.update({
+                where: { id_carrito: existing.id_carrito },
+                data: { cantidad: existing.cantidad + cantidad }
+            });
+            return result.id_carrito;
         } else {
-            // Si no existe, crear nuevo item
-            const insertQuery = `
-        INSERT INTO CARRITO (id_usuario, id_producto, cantidad)
-        VALUES (?, ?, ?)
-      `;
-
-            const [result] = await db.query(insertQuery, [id_usuario, id_producto, cantidad]);
-            return result.insertId;
+            const result = await prisma.carrito.create({
+                data: {
+                    id_usuario: parseInt(id_usuario, 10),
+                    id_producto: parseInt(id_producto, 10),
+                    cantidad: parseInt(cantidad, 10)
+                }
+            });
+            return result.id_carrito;
         }
     }
 
-    // Actualizar cantidad de un item
     static async updateCantidad(id_carrito, cantidad) {
-        if (cantidad <= 0) {
-            // Si la cantidad es 0 o negativa, eliminar el item
-            return await this.removeItem(id_carrito);
+        if (cantidad <= 0) return await this.removeItem(id_carrito);
+
+        try {
+            await prisma.carrito.update({
+                where: { id_carrito: parseInt(id_carrito, 10) },
+                data: { cantidad: parseInt(cantidad, 10) }
+            });
+            return true;
+        } catch {
+            return false;
         }
-
-        const query = `
-      UPDATE CARRITO 
-      SET cantidad = ? 
-      WHERE id_carrito = ?
-    `;
-
-        const [result] = await db.query(query, [cantidad, id_carrito]);
-        return result.affectedRows > 0;
     }
 
-    // Eliminar un item del carrito
     static async removeItem(id_carrito) {
-        const query = 'DELETE FROM CARRITO WHERE id_carrito = ?';
-        const [result] = await db.query(query, [id_carrito]);
-        return result.affectedRows > 0;
+        try {
+            await prisma.carrito.delete({
+                where: { id_carrito: parseInt(id_carrito, 10) }
+            });
+            return true;
+        } catch {
+            return false;
+        }
     }
 
-    // Vaciar todo el carrito de un usuario
     static async clearCarrito(id_usuario) {
-        const query = 'DELETE FROM CARRITO WHERE id_usuario = ?';
-        const [result] = await db.query(query, [id_usuario]);
-        return result.affectedRows;
+        const result = await prisma.carrito.deleteMany({
+            where: { id_usuario: parseInt(id_usuario, 10) }
+        });
+        return result.count;
     }
 
-    // Obtener total del carrito
     static async getTotal(id_usuario) {
-        const query = `
-      SELECT SUM(p.precio * c.cantidad) as total
-      FROM CARRITO c
-      INNER JOIN producto p ON c.id_producto = p.id_producto
-      WHERE c.id_usuario = ? AND p.esta_disponible = TRUE
-    `;
+        const items = await prisma.carrito.findMany({
+            where: {
+                id_usuario: parseInt(id_usuario, 10),
+                producto: { estatus: true }
+            },
+            include: { producto: { select: { precio: true } } }
+        });
 
-        const [result] = await db.query(query, [id_usuario]);
-        return parseFloat(result[0].total || 0);
+        const total = items.reduce((acc, current) => {
+            const precio = typeof current.producto?.precio === 'object' && current.producto?.precio !== null ? Number(current.producto.precio) : current.producto?.precio;
+            return acc + (precio * current.cantidad);
+        }, 0);
+
+        return total || 0;
     }
 
-    // Obtener cantidad de items en el carrito
     static async getItemCount(id_usuario) {
-        const query = `
-      SELECT SUM(cantidad) as total_items
-      FROM CARRITO
-      WHERE id_usuario = ?
-    `;
-
-        const [result] = await db.query(query, [id_usuario]);
-        return parseInt(result[0].total_items || 0);
+        const group = await prisma.carrito.aggregate({
+            where: { id_usuario: parseInt(id_usuario, 10) },
+            _sum: { cantidad: true }
+        });
+        return group._sum.cantidad || 0;
     }
 
-    // Verificar disponibilidad de todos los productos en el carrito
     static async verificarDisponibilidad(id_usuario) {
-        const query = `
-      SELECT 
-        c.id_carrito,
-        c.id_producto,
-        c.cantidad,
-        p.nombre,
-        p.inventario,
-        p.esta_disponible
-      FROM CARRITO c
-      INNER JOIN producto p ON c.id_producto = p.id_producto
-      WHERE c.id_usuario = ?
-    `;
-
-        const [items] = await db.query(query, [id_usuario]);
+        const items = await prisma.carrito.findMany({
+            where: { id_usuario: parseInt(id_usuario, 10) },
+            include: { producto: { select: { nombre: true, inventario: true, estatus: true } } }
+        });
 
         const noDisponibles = items.filter(item =>
-            !item.esta_disponible || item.inventario < item.cantidad
+            !item.producto.estatus || item.producto.inventario < item.cantidad
         );
 
         return {
             todosDisponibles: noDisponibles.length === 0,
             itemsNoDisponibles: noDisponibles.map(item => ({
                 id_producto: item.id_producto,
-                nombre: item.nombre,
+                nombre: item.producto.nombre,
                 cantidadSolicitada: item.cantidad,
-                cantidadDisponible: item.inventario,
-                estaDisponible: item.esta_disponible
+                cantidadDisponible: item.producto.inventario,
+                estaDisponible: item.producto.estatus
             }))
         };
     }
 
-    // Obtener carrito agrupado por oferente (útil para crear pedidos separados)
     static async getCarritoAgrupadoPoroferente(id_usuario) {
-        const query = `
-      SELECT 
-        c.id_carrito,
-        c.id_producto,
-        c.cantidad,
-        p.nombre,
-        p.precio,
-        p.imagenes,
-        o.id_oferente,
-        o.nombre_negocio,
-        o.direccion
-      FROM CARRITO c
-      INNER JOIN producto p ON c.id_producto = p.id_producto
-      INNER JOIN oferente o ON p.id_oferente = o.id_oferente
-      WHERE c.id_usuario = ? AND p.esta_disponible = TRUE
-      ORDER BY o.id_oferente, c.fecha_agregado DESC
-    `;
+        const items = await prisma.carrito.findMany({
+            where: { id_usuario: parseInt(id_usuario, 10), producto: { estatus: true } },
+            include: {
+                producto: {
+                    include: {
+                        oferente: { select: { id_oferente: true, nombre_negocio: true, direccion: true } }
+                    }
+                }
+            },
+            orderBy: { fecha_agregado: 'desc' }
+        });
 
-        const [items] = await db.query(query, [id_usuario]);
-
-        // Agrupar por oferente
         const agrupado = items.reduce((acc, item) => {
-            const oferenteId = item.id_oferente;
+            const oferente = item.producto.oferente;
+            const oferenteId = oferente.id_oferente;
 
             if (!acc[oferenteId]) {
                 acc[oferenteId] = {
                     id_oferente: oferenteId,
-                    nombre_negocio: item.nombre_negocio,
-                    direccion: item.direccion,
+                    nombre_negocio: oferente.nombre_negocio,
+                    direccion: oferente.direccion,
                     productos: [],
                     total: 0
                 };
             }
 
-            const subtotal = parseFloat(item.precio) * item.cantidad;
+            const precioNum = typeof item.producto.precio === 'object' && item.producto.precio !== null ? Number(item.producto.precio) : item.producto.precio;
+            const subtotal = precioNum * item.cantidad;
 
             acc[oferenteId].productos.push({
                 id_carrito: item.id_carrito,
                 id_producto: item.id_producto,
-                nombre: item.nombre,
-                precio: parseFloat(item.precio),
+                nombre: item.producto.nombre,
+                precio: precioNum,
                 cantidad: item.cantidad,
-                imagenes: item.imagenes ? JSON.parse(item.imagenes) : [],
+                imagenes: this.parseImagenes(item.producto.imagenes),
                 subtotal
             });
 
             acc[oferenteId].total += subtotal;
-
             return acc;
         }, {});
 
-        return Object.values(agrupado);
+        return Object.values(agrupado).sort((a, b) => a.id_oferente - b.id_oferente);
     }
 
-    // Verificar si un producto está en el carrito de un usuario
     static async isInCarrito(id_usuario, id_producto) {
-        const query = `
-      SELECT id_carrito, cantidad 
-      FROM CARRITO 
-      WHERE id_usuario = ? AND id_producto = ?
-    `;
-
-        const [result] = await db.query(query, [id_usuario, id_producto]);
-        return result.length > 0 ? result[0] : null;
+        return await prisma.carrito.findFirst({
+            where: {
+                id_usuario: parseInt(id_usuario, 10),
+                id_producto: parseInt(id_producto, 10)
+            }
+        });
     }
 }
 

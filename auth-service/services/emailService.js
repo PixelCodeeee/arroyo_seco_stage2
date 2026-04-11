@@ -45,6 +45,35 @@ class EmailService {
             return false;
         }
     }
+
+    async sendPasswordResetCode(email, code, userName) {
+        try {
+            const response = await this.resend.emails.send({
+                from: 'Arroyo Seco <noreply@arroyoseco.online>',
+                to: email,
+                subject: 'Tu código de recuperación - Arroyo Seco',
+                html: `
+                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                        <h2 style="color: #2c3e50;">Recuperación de Contraseña</h2>
+                        <p>Hola ${userName},</p>
+                        <p>Hemos recibido una solicitud para restablecer tu contraseña. Tu código de verificación es:</p>
+                        <div style="background-color: #f8f9fa; padding: 20px; text-align: center; border-radius: 5px; margin: 20px 0;">
+                            <h1 style="color: #007bff; letter-spacing: 5px; margin: 0;">${code}</h1>
+                        </div>
+                        <p>Este código expirará en 10 minutos.</p>
+                        <p>Si no solicitaste este cambio, puedes ignorar este correo con seguridad. Tu contraseña no cambiará hasta que ingreses el código.</p>
+                        <hr style="border: none; border-top: 1px solid #dee2e6; margin: 30px 0;">
+                        <p style="color: #6c757d; font-size: 12px;">Arroyo Seco - Seguridad de Cuenta</p>
+                    </div>
+                `,
+            });
+            console.log('✅ Password reset code emailed to:', email);
+            return true;
+        } catch (error) {
+            console.error('❌ Error sending password reset email:', error);
+            return false;
+        }
+    }
 }
 
 module.exports = new EmailService();

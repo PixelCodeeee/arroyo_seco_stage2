@@ -7,8 +7,9 @@ const app = express();
 const PORT = process.env.PORT || 5003;
 
 // Middleware
+const allowedOrigins = process.env.NODE_ENV === 'production' ? ['https://arroyoseco.online'] : ['https://arroyoseco.online', 'http://localhost:5173'];
 const corsOptions = {
-    origin: process.env.FRONTEND_URL || 'https://arroyoseco.online',
+    origin: process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : allowedOrigins,
     optionsSuccessStatus: 200
 };
 app.use(cors(corsOptions));
@@ -27,48 +28,15 @@ app.get('/health', (req, res) => {
 // Database Initialization
 async function initDB() {
     try {
-        await db.query(`
-            CREATE TABLE IF NOT EXISTS pedido (
-                id_pedido INT AUTO_INCREMENT PRIMARY KEY,
-                id_usuario INT NOT NULL,
-                monto_total DECIMAL(10, 2) NOT NULL,
-                fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                estado ENUM('pendiente', 'pagado', 'enviado', 'completado') DEFAULT 'pendiente',
-                metodo_pago VARCHAR(50),
-                FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario) ON DELETE CASCADE
-            )
-        `);
-
-        await db.query(`
-            CREATE TABLE IF NOT EXISTS item_pedido (
-                id_item_pedido INT AUTO_INCREMENT PRIMARY KEY,
-                id_pedido INT NOT NULL,
-                id_producto INT NOT NULL,
-                cantidad INT NOT NULL,
-                precio_compra DECIMAL(10, 2) NOT NULL,
-                FOREIGN KEY (id_pedido) REFERENCES pedido(id_pedido) ON DELETE CASCADE,
-                FOREIGN KEY (id_producto) REFERENCES producto(id_producto)
-            )
-        `);
-
-        // Note: CARRITO table might already exist or need creation.
-        await db.query(`
-            CREATE TABLE IF NOT EXISTS carrito (
-                id_carrito INT AUTO_INCREMENT PRIMARY KEY,
-                id_usuario INT NOT NULL,
-                id_producto INT NOT NULL,
-                cantidad INT DEFAULT 1,
-                fecha_agregado TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario) ON DELETE CASCADE,
-                FOREIGN KEY (id_producto) REFERENCES producto(id_producto) ON DELETE CASCADE
-            )
-        `);
-
-        console.log('✓ Order Service tables initialized');
+        console.log('✓ Order Service relies on Prisma schema for mappings');
     } catch (error) {
         console.error('❌ Error initializing database tables:', error);
     }
 }
+
+// Error handling middleware
+const prismaErrorHandler = require('./middleware/prismaErrorHandler');
+app.use(prismaErrorHandler);
 
 // Start server
 app.listen(PORT, async () => {

@@ -6,6 +6,7 @@ exports.obtenerProductosPorOferente = async (req, res) => {
     try {
         const { oferenteId } = req.params;
 
+
         // Validar que el oferente existe
         const oferente = await Oferente.findById(oferenteId);
         if (!oferente) {
@@ -17,7 +18,7 @@ exports.obtenerProductosPorOferente = async (req, res) => {
 
         res.json({
             success: true,
-            productos: productos.filter(p => p.estatus === 1) // Solo productos activos
+            productos
         });
 
     } catch (err) {
@@ -28,7 +29,7 @@ exports.obtenerProductosPorOferente = async (req, res) => {
 
 exports.crearProducto = async (req, res) => {
     try {
-        const { id_oferente, nombre, descripcion, precio, inventario, imagenes, estatus = 1, id_categoria } = req.body;
+        const { id_oferente, nombre, descripcion, precio, inventario, imagenes, estatus = true, id_categoria } = req.body;
 
         // Validación básica
         if (!id_oferente || !nombre || !precio || !id_categoria) {

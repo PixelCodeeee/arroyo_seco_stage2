@@ -189,6 +189,80 @@ exports.resend2FACode = async (req, res) => {
     }
 };
 
+exports.forgotPassword = async (req, res) => {
+    try {
+        const { correo } = req.body;
+        if (!correo) return res.status(400).json({ error: 'Correo requerido' });
+
+        const usuario = await Usuario.findByEmail(correo);
+        if (!usuario) {
+            return res.json({ message: 'Si el correo existe, el código fue enviado.' });
+        }
+
+        const codigo = await Codigo2FA.create(usuario.id_usuario);
+        await emailService.sendPasswordResetCode(correo, codigo, usuario.nombre);
+
+        res.json({ message: 'Si el correo existe, el código fue enviado.' });
+    } catch (error) {
+        console.error('Error in forgotPassword:', error);
+        res.status(500).json({ error: 'Error al procesar solicitud' });
+    }
+};
+
+exports.resetPassword = async (req, res) => {
+    try {
+        const { correo, codigo, nuevaContrasena } = req.body;
+        if (!correo || !codigo || !nuevaContrasena) {
+            return res.status(400).json({ error: 'Faltan datos requeridos' });
+        }
+
+        if (nuevaContrasena.length < 6) {
+            return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
+        }
+
+        const usuario = await Usuario.findByEmail(correo);
+        if (!usuario) return res.status(404).json({ error: 'Usuario no encontrado' });
+
+        const isValid = await Codigo2FA.verify(usuario.id_usuario, codigo);
+        if (!isValid) return res.status(401).json({ error: 'Código inválido o expirado' });
+
+        await Usuario.update(usuario.id_usuario, { contrasena: nuevaContrasena });
+
+        res.json({ message: 'Contraseña actualizada exitosamente' });
+    } catch (error) {
+        console.error('Error in resetPassword:', error);
+        res.status(500).json({ error: 'Error al restablecer contraseña' });
+    }
+};
+
+exports.updatePassword = async (req, res) => {
+    try {
+        const { contrasenaActual, nuevaContrasena } = req.body;
+        const userId = req.params.id;
+
+        if (req.user.id.toString() !== userId && req.user.rol !== 'admin') {
+            return res.status(403).json({ error: 'No autorizado para cambiar la contraseña de este usuario' });
+        }
+
+        if (!contrasenaActual || !nuevaContrasena) {
+            return res.status(400).json({ error: 'Ambas contraseñas son requeridas' });
+        }
+
+        const usuarioFull = await Usuario.findByEmail(req.user.correo);
+        if (!usuarioFull) return res.status(404).json({ error: 'Usuario no encontrado' });
+
+        const isPasswordValid = await Usuario.verifyPassword(contrasenaActual, usuarioFull.contrasena_hash);
+        if (!isPasswordValid) return res.status(401).json({ error: 'La contraseña actual es incorrecta' });
+
+        await Usuario.update(userId, { contrasena: nuevaContrasena });
+
+        res.json({ message: 'Contraseña actualizada exitosamente' });
+    } catch (error) {
+        console.error('Error in updatePassword:', error);
+        res.status(500).json({ error: 'Error al cambiar contraseña' });
+    }
+};
+
 exports.obtenerUsuarios = async (req, res) => {
     try {
         const usuarios = await Usuario.findAll();

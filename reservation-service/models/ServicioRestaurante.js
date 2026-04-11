@@ -1,9 +1,10 @@
-const db = require('../config/db');
+const { prisma } = require('../config/db');
 
 class ServicioRestaurante {
     static async findById(id) {
-        const [rows] = await db.query('SELECT * FROM servicio_restaurante WHERE id_servicio = ?', [id]);
-        return rows[0] || null;
+        return await prisma.servicioRestaurante.findUnique({
+            where: { id_servicio: parseInt(id, 10) }
+        });
     }
 }
 

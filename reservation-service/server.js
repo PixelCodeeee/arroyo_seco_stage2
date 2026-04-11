@@ -7,8 +7,9 @@ const app = express();
 const PORT = process.env.PORT || 5004;
 
 // Middleware
+const allowedOrigins = process.env.NODE_ENV === 'production' ? ['https://arroyoseco.online'] : ['https://arroyoseco.online', 'http://localhost:5173'];
 const corsOptions = {
-    origin: process.env.FRONTEND_URL || 'https://arroyoseco.online',
+    origin: process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : allowedOrigins,
     optionsSuccessStatus: 200
 };
 app.use(cors(corsOptions));
@@ -23,33 +24,11 @@ app.get('/health', (req, res) => {
     res.json({ status: 'OK', service: 'reservation-service' });
 });
 
-// Database Initialization
-async function initDB() {
-    try {
-        await db.query(`
-            CREATE TABLE IF NOT EXISTS reserva (
-                id_reserva INT AUTO_INCREMENT PRIMARY KEY,
-                id_usuario INT NOT NULL,
-                id_servicio INT NOT NULL,
-                fecha DATE NOT NULL,
-                hora TIME NOT NULL,
-                numero_personas INT NOT NULL,
-                estado ENUM('pendiente', 'confirmada', 'cancelada') DEFAULT 'pendiente',
-                notas TEXT,
-                fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario) ON DELETE CASCADE,
-                FOREIGN KEY (id_servicio) REFERENCES servicio_restaurante(id_servicio) ON DELETE CASCADE
-            )
-        `);
-
-        console.log('✓ Reservation Service tables initialized');
-    } catch (error) {
-        console.error('❌ Error initializing database tables:', error);
-    }
-}
+// Error handling middleware
+const prismaErrorHandler = require('./middleware/prismaErrorHandler');
+app.use(prismaErrorHandler);
 
 // Start server
-app.listen(PORT, async () => {
-    await initDB();
+app.listen(PORT, () => {
     console.log(`Reservation Service running on port ${PORT}`);
 });

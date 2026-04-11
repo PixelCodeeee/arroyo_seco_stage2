@@ -48,7 +48,7 @@ exports.agregarAlCarrito = async (req, res) => {
             });
         }
 
-        if (!producto.esta_disponible) {
+        if (!producto.estatus) {
             return res.status(400).json({
                 success: false,
                 message: 'Producto no disponible'

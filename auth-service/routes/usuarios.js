@@ -8,8 +8,11 @@ router.post('/register', usuarioController.crearUsuario);
 router.post('/login', usuarioController.loginUsuario);
 router.post('/verify-2fa', usuarioController.verify2FA);
 router.post('/resend-2fa', usuarioController.resend2FACode);
+router.post('/forgot-password', usuarioController.forgotPassword);
+router.post('/reset-password', usuarioController.resetPassword);
 
 // Protected routes
+router.put('/:id/password', verifyToken, usuarioController.updatePassword);
 router.get('/', verifyToken, verifyAdmin, usuarioController.obtenerUsuarios);
 router.get('/:id', verifyToken, usuarioController.obtenerUsuarioPorId);
 router.put('/:id', verifyToken, usuarioController.actualizarUsuario);
