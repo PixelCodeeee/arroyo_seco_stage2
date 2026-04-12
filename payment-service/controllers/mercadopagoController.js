@@ -6,6 +6,20 @@ const Oferente = require('../models/Oferente');
 const APP_URL = process.env.APP_URL || 'https://arroyoseco.online';
 
 // ─────────────────────────────────────────────────────────────────────
+// HELPER — crea un cliente axios usando el token del oferente
+// Esto es lo que hace que sea un pago de marketplace real:
+// la preferencia se crea en nombre del oferente, no de la plataforma
+// ─────────────────────────────────────────────────────────────────────
+const createOferenteClient = (accessToken) =>
+  axios.create({
+    baseURL: MP_CONFIG.apiUrl,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`
+    }
+  });
+
+// ─────────────────────────────────────────────────────────────────────
 // 1. CREAR PREFERENCIA DE PAGO (carrito del comprador)
 //    Ruta: POST /api/paypal/create-order
 // ─────────────────────────────────────────────────────────────────────
@@ -44,12 +58,30 @@ exports.createOrder = async (req, res, next) => {
         pending: `${APP_URL}/carrito?status=pending`
       },
       statement_descriptor: 'Arroyo Seco',
-      external_reference: id_oferente ? `oferente_${id_oferente}` : 'compra_directa'
+      external_reference: id_oferente ? `oferente_${id_oferente}` : 'compra_directa',
+      marketplace_fee: 0 // plataforma no cobra comisión por ahora, se puede cambiar después
     };
 
-    const response = await mpClient.post('/checkout/preferences', preferenceData);
+    let client = mpClient; // fallback: plataforma (si no hay oferente conectado)
+    let usandoOferente = false;
 
-    console.log('✅ Preferencia MP creada [PRODUCTION]:', response.data.id);
+    // Si hay un oferente, usar su access_token para crear la preferencia
+    // Esto es el marketplace flow real — el dinero va a la cuenta del oferente
+    if (id_oferente) {
+      const oferente = await Oferente.findById(id_oferente);
+
+      if (oferente?.mp_access_token && oferente?.mp_estado === 'activo') {
+        client = createOferenteClient(oferente.mp_access_token);
+        usandoOferente = true;
+        console.log(`🏪 Usando token del oferente ${id_oferente} para crear preferencia`);
+      } else {
+        console.warn(`⚠️ Oferente ${id_oferente} no tiene MP conectado, usando token de plataforma`);
+      }
+    }
+
+    const response = await client.post('/checkout/preferences', preferenceData);
+
+    console.log(`✅ Preferencia MP creada [${usandoOferente ? 'MARKETPLACE' : 'PLATAFORMA'}]:`, response.data.id);
 
     return res.json({
       success: true,
@@ -304,6 +336,18 @@ exports.getMpEstado = async (req, res, next) => {
   }
 };
 
+// ─────────────────────────────────────────────────────────────────────
+// 8. CONFIG PÚBLICA (Public Key para el frontend)
+//    Ruta: GET /api/paypal/config
+// ─────────────────────────────────────────────────────────────────────
+exports.getPublicConfig = (req, res) => {
+  return res.json({ public_key: MP_CONFIG.publicKey });
+};
+
+// ─────────────────────────────────────────────────────────────────────
+// 9. DEBUG — verificar variables de entorno (REMOVER EN PRODUCCIÓN FINAL)
+//    Ruta: GET /api/mercadopago/debug
+// ─────────────────────────────────────────────────────────────────────
 exports.debugEnv = (req, res) => {
   res.json({
     token_prefix: process.env.MP_ACCESS_TOKEN?.substring(0, 15),
@@ -312,12 +356,4 @@ exports.debugEnv = (req, res) => {
     redirect_uri: process.env.MP_REDIRECT_URI,
     node_env: process.env.NODE_ENV
   });
-};
-
-// ─────────────────────────────────────────────────────────────────────
-// 8. CONFIG PÚBLICA (Public Key para el frontend)
-//    Ruta: GET /api/paypal/config
-// ─────────────────────────────────────────────────────────────────────
-exports.getPublicConfig = (req, res) => {
-  return res.json({ public_key: MP_CONFIG.publicKey });
 };
