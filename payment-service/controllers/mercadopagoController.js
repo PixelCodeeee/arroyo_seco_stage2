@@ -79,9 +79,17 @@ exports.createOrder = async (req, res, next) => {
       }
     }
 
+    console.log('🔍 PREFERENCE REQUEST:', JSON.stringify({
+      usando_oferente: usandoOferente,
+      id_oferente,
+      oferente_estado: oferente?.mp_estado,
+      token_prefix: oferente?.mp_access_token?.substring(0, 15),
+      preferenceData
+    }, null, 2));
+
     const response = await client.post('/checkout/preferences', preferenceData);
 
-    console.log(`✅ Preferencia MP creada [${usandoOferente ? 'MARKETPLACE' : 'PLATAFORMA'}]:`, response.data.id);
+    console.log('🔍 PREFERENCE RESPONSE:', JSON.stringify(response.data, null, 2));
 
     return res.json({
       success: true,
