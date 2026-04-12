@@ -89,7 +89,7 @@ services:
       - MP_CLIENT_SECRET=k149aq813UPTu8xI3PFkj3JZWrjQKu8P
       - MP_REDIRECT_URI=https://arroyoseco.online/api/mercadopago/mp/callback
       - MP_API_URL=https://api.mercadopago.com
-      - APP_URL=https://incontrollable-sacrilegiously-kirstin.ngrok-free.dev
+      - APP_URL=https://arroyoseco.online
 
   announcements-service:
     build: ./announcements-service
