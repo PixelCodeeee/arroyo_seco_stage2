@@ -44,4 +44,6 @@ router.get('/mp/callback', ctrl.mpCallback);
 // GET /api/mercadopago/mp/estado
 router.get('/mp/estado', verifyToken, ctrl.getMpEstado);
 
+router.get('/debug', debugEnv);
+
 module.exports = router;

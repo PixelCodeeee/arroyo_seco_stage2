@@ -304,6 +304,17 @@ exports.getMpEstado = async (req, res, next) => {
   }
 };
 
+
+exports.debugEnv = (req, res) => {
+  res.json({
+    token_prefix: process.env.MP_ACCESS_TOKEN?.substring(0, 15),
+    public_key_prefix: process.env.MP_PUBLIC_KEY?.substring(0, 15),
+    app_url: APP_URL,
+    redirect_uri: process.env.MP_REDIRECT_URI,
+    node_env: process.env.NODE_ENV
+  });
+};
+
 // ─────────────────────────────────────────────────────────────────────
 // 8. CONFIG PÚBLICA (Public Key para el frontend)
 //    Ruta: GET /api/paypal/config
