@@ -58,8 +58,7 @@ exports.createOrder = async (req, res, next) => {
 
     const response = await mpClient.post('/checkout/preferences', preferenceData);
 
-    console.log(`✅ Preferencia MP creada [${IS_SANDBOX ? 'SANDBOX' : 'PRODUCTION'}]:`, response.data.id);
-
+    console.log('🔍 PREFERENCE FULL:', JSON.stringify(response.data, null, 2));
     return res.json({
       success: true,
       orderID: response.data.id,
