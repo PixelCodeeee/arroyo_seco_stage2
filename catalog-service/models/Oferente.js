@@ -1,3 +1,5 @@
+//catalog service oferente model
+
 const { prisma } = require('../config/db');
 
 class Oferente {
@@ -127,10 +129,10 @@ class Oferente {
     static mapUsuarioFields(oferente) {
         if (!oferente) return oferente;
         const { usuario, ...rest } = oferente;
-        
+
         let safeHorario = rest.horario_disponibilidad;
         if (typeof safeHorario === 'string') {
-            try { safeHorario = JSON.parse(safeHorario); } 
+            try { safeHorario = JSON.parse(safeHorario); }
             catch { safeHorario = null; }
         }
 
