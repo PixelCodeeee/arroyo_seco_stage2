@@ -3,6 +3,8 @@ const { MP_CONFIG, mpClient } = require('../config/mercadopago');
 const Pedido = require('../models/Pedido');
 const Oferente = require('../models/Oferente');
 
+const APP_URL = process.env.APP_URL || 'https://arroyoseco.online';
+
 // ─────────────────────────────────────────────────────────────────────
 // 1. CREAR PREFERENCIA DE PAGO (carrito del comprador)
 //    Ruta: POST /api/paypal/create-order
@@ -36,13 +38,11 @@ exports.createOrder = async (req, res, next) => {
         unit_price: parseFloat(item.precio),
         currency_id: 'MXN'
       })),
-      // ✅ back_urls apuntan al frontend en localhost
       back_urls: {
-        success: `http://localhost:5173/carrito?status=success`,
-        failure: `http://localhost:5173/carrito?status=failure`,
-        pending: `http://localhost:5173/carrito?status=pending`
+        success: `${APP_URL}/carrito?status=success`,
+        failure: `${APP_URL}/carrito?status=failure`,
+        pending: `${APP_URL}/carrito?status=pending`
       },
-      // ✅ Sin auto_return para que MP muestre la pantalla de confirmación
       statement_descriptor: 'Arroyo Seco',
       external_reference: id_oferente ? `oferente_${id_oferente}` : 'compra_directa'
     };
@@ -70,7 +70,6 @@ exports.createOrder = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────
 exports.captureOrder = async (req, res, next) => {
   try {
-    // ✅ Corregido: id_usuario (no id)
     const { payment_id, cartData, id_usuario } = req.body;
 
     if (!payment_id) {
@@ -232,7 +231,7 @@ exports.mpCallback = async (req, res, next) => {
     const { code, state } = req.query;
 
     if (!code || !state) {
-      return res.redirect(`http://localhost:5173/oferentes?mp_error=sin_codigo`);
+      return res.redirect(`${APP_URL}/oferentes?mp_error=sin_codigo`);
     }
 
     let id_oferente;
@@ -240,7 +239,7 @@ exports.mpCallback = async (req, res, next) => {
       const decoded = JSON.parse(Buffer.from(state, 'base64').toString('utf8'));
       id_oferente = decoded.id_oferente;
     } catch {
-      return res.redirect(`http://localhost:5173/oferentes?mp_error=state_invalido`);
+      return res.redirect(`${APP_URL}/oferentes?mp_error=state_invalido`);
     }
 
     // Intercambiar código por tokens
@@ -267,12 +266,11 @@ exports.mpCallback = async (req, res, next) => {
       mp_estado: 'activo'
     });
 
-    // ✅ Redirect al frontend en localhost
-    return res.redirect(`http://localhost:5173/oferentes?mp_status=conectado&id_oferente=${id_oferente}`);
+    return res.redirect(`${APP_URL}/oferentes?mp_status=conectado&id_oferente=${id_oferente}`);
 
   } catch (error) {
     console.error('❌ Error mpCallback:', error.response?.data || error.message);
-    return res.redirect(`http://localhost:5173/oferentes?mp_error=token_fallido`);
+    return res.redirect(`${APP_URL}/oferentes?mp_error=token_fallido`);
   }
 };
 
@@ -282,7 +280,6 @@ exports.mpCallback = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────
 exports.getMpEstado = async (req, res, next) => {
   try {
-    // ✅ Corregido: req.user?.id (no req.user?.id_usuario)
     const id_usuario = req.user?.id;
 
     if (!id_usuario) {
