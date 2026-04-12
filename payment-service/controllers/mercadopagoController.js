@@ -64,11 +64,12 @@ exports.createOrder = async (req, res, next) => {
 
     let client = mpClient; // fallback: plataforma (si no hay oferente conectado)
     let usandoOferente = false;
+    let oferente = null; // declare outside so it's accessible in the debug log
 
     // Si hay un oferente, usar su access_token para crear la preferencia
     // Esto es el marketplace flow real — el dinero va a la cuenta del oferente
     if (id_oferente) {
-      const oferente = await Oferente.findById(id_oferente);
+      oferente = await Oferente.findById(id_oferente);
 
       if (oferente?.mp_access_token && oferente?.mp_estado === 'activo') {
         client = createOferenteClient(oferente.mp_access_token);
