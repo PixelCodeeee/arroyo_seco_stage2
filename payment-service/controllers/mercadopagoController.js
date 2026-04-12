@@ -5,20 +5,13 @@ const Oferente = require('../models/Oferente');
 
 const APP_URL = process.env.APP_URL || 'https://arroyoseco.online';
 
-// ⚠️ SANDBOX MODE — auto-detected from MP_ACCESS_TOKEN prefix
-// To switch to production: replace TEST- keys with APP_USR- keys in docker-compose env
-const IS_SANDBOX = process.env.MP_ACCESS_TOKEN?.startsWith('TEST-');
-
 // ─────────────────────────────────────────────────────────────────────
 // 1. CREAR PREFERENCIA DE PAGO (carrito del comprador)
 //    Ruta: POST /api/paypal/create-order
 // ─────────────────────────────────────────────────────────────────────
 exports.createOrder = async (req, res, next) => {
   try {
-    const { items, total /*, id_oferente */ } = req.body;
-
-    // ⚠️ SANDBOX: id_oferente ignored — no marketplace/OAuth split in test mode
-    // PRODUCTION: uncomment id_oferente above and the external_reference line below
+    const { items, total, id_oferente } = req.body;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'No hay items en el carrito' });
@@ -51,24 +44,19 @@ exports.createOrder = async (req, res, next) => {
         pending: `${APP_URL}/carrito?status=pending`
       },
       statement_descriptor: 'Arroyo Seco',
-      // ⚠️ SANDBOX: hardcoded reference, no oferente association
-      external_reference: 'sandbox_test'
-      // PRODUCTION: external_reference: id_oferente ? `oferente_${id_oferente}` : 'compra_directa'
+      external_reference: id_oferente ? `oferente_${id_oferente}` : 'compra_directa'
     };
 
     const response = await mpClient.post('/checkout/preferences', preferenceData);
 
-    console.log('🔍 PREFERENCE FULL:', JSON.stringify(response.data, null, 2));
+    console.log('✅ Preferencia MP creada [PRODUCTION]:', response.data.id);
+
     return res.json({
       success: true,
       orderID: response.data.id,
       preference_id: response.data.id,
-      // ⚠️ SANDBOX: always return sandbox_init_point for both fields
-      init_point: response.data.sandbox_init_point,
+      init_point: response.data.init_point,
       sandbox_url: response.data.sandbox_init_point
-      // PRODUCTION:
-      // init_point: response.data.init_point,
-      // sandbox_url: response.data.sandbox_init_point
     });
 
   } catch (error) {
@@ -97,7 +85,7 @@ exports.captureOrder = async (req, res, next) => {
     const pagoResp = await mpClient.get(`/v1/payments/${payment_id}`);
     const pago = pagoResp.data;
 
-    console.log(`💳 Pago recibido [${IS_SANDBOX ? 'SANDBOX' : 'PRODUCTION'}]:`, pago.status, pago.transaction_amount);
+    console.log('💳 Pago recibido [PRODUCTION]:', pago.status, pago.transaction_amount);
 
     if (pago.status !== 'approved') {
       return res.status(400).json({
@@ -121,11 +109,9 @@ exports.captureOrder = async (req, res, next) => {
       estado: 'pagado',
       metodo_pago: 'mercadopago',
       payment_id: payment_id.toString(),
-      // ⚠️ SANDBOX: no oferente association
-      id_oferente: null,
-      // PRODUCTION: id_oferente: pago.external_reference?.startsWith('oferente_')
-      //   ? parseInt(pago.external_reference.split('_')[1])
-      //   : null,
+      id_oferente: pago.external_reference?.startsWith('oferente_')
+        ? parseInt(pago.external_reference.split('_')[1])
+        : null,
       items
     });
 
@@ -203,21 +189,9 @@ exports.webhook = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────
 // 5. OAUTH OFERENTE — obtener URL de autorización
 //    Ruta: GET /api/paypal/mp/oauth-url
-// ⚠️ SANDBOX: disabled — OAuth always returns APP_USR- tokens regardless
-//    of test users, which conflicts with TEST- platform credentials.
-//    PRODUCTION: remove the IS_SANDBOX early return below.
 // ─────────────────────────────────────────────────────────────────────
 exports.getOAuthUrl = async (req, res, next) => {
   try {
-    // ⚠️ SANDBOX: disabled
-    if (IS_SANDBOX) {
-      return res.status(503).json({
-        error: 'Conexión con MercadoPago no disponible en modo sandbox',
-        sandbox: true
-      });
-    }
-
-    // PRODUCTION ↓
     const id_usuario = req.user?.id;
 
     if (!id_usuario) {
@@ -250,16 +224,9 @@ exports.getOAuthUrl = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────
 // 6. CALLBACK OAuth — MP redirige aquí con el código
 //    Ruta: GET /api/paypal/mp/callback
-// ⚠️ SANDBOX: disabled alongside getOAuthUrl
 // ─────────────────────────────────────────────────────────────────────
 exports.mpCallback = async (req, res, next) => {
   try {
-    // ⚠️ SANDBOX: disabled
-    if (IS_SANDBOX) {
-      return res.redirect(`${APP_URL}/oferentes?mp_error=sandbox_no_oauth`);
-    }
-
-    // PRODUCTION ↓
     const { code, state } = req.query;
 
     if (!code || !state) {
@@ -329,9 +296,7 @@ exports.getMpEstado = async (req, res, next) => {
       nombre: oferente.nombre_negocio,
       mp_estado: oferente.mp_estado,
       mp_user_id: oferente.mp_user_id,
-      // ⚠️ SANDBOX: always report as not connected since OAuth is disabled
-      conectado: IS_SANDBOX ? false : oferente.mp_estado === 'activo',
-      sandbox: IS_SANDBOX
+      conectado: oferente.mp_estado === 'activo'
     });
 
   } catch (error) {
@@ -344,8 +309,5 @@ exports.getMpEstado = async (req, res, next) => {
 //    Ruta: GET /api/paypal/config
 // ─────────────────────────────────────────────────────────────────────
 exports.getPublicConfig = (req, res) => {
-  return res.json({
-    public_key: MP_CONFIG.publicKey,
-    sandbox: IS_SANDBOX
-  });
+  return res.json({ public_key: MP_CONFIG.publicKey });
 };
