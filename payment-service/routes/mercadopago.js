@@ -39,7 +39,7 @@ router.post('/webhook', ctrl.webhook);
 router.get('/mp/oauth-url', verifyToken, ctrl.getOAuthUrl);
 
 // GET /api/mercadopago/mp/callback
-router.get('/paypal/callback', ctrl.mpCallback);
+router.get('/mp/callback', ctrl.mpCallback);
 
 // GET /api/mercadopago/mp/estado
 router.get('/mp/estado', verifyToken, ctrl.getMpEstado);
