@@ -304,7 +304,6 @@ exports.getMpEstado = async (req, res, next) => {
   }
 };
 
-
 exports.debugEnv = (req, res) => {
   res.json({
     token_prefix: process.env.MP_ACCESS_TOKEN?.substring(0, 15),
