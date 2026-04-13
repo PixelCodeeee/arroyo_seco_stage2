@@ -83,10 +83,10 @@ services:
       - DB_NAME=arroyo_seco
       - PORT=5005
       - JWT_SECRET=AlphaPrime.2026
-      - MP_PUBLIC_KEY=APP_USR-57d13c73-64fb-4519-913d-d3a4d33a5648
-      - MP_ACCESS_TOKEN=APP_USR-6374357289996308-030414-331536dc11e5e1f8d167040be8f8b49d-3231471559
-      - MP_CLIENT_ID=6374357289996308
-      - MP_CLIENT_SECRET=k149aq813UPTu8xI3PFkj3JZWrjQKu8P
+      - MP_PUBLIC_KEY=APP_USR-12542022-ac74-4da7-8bc4-a95ba5b62314
+      - MP_ACCESS_TOKEN=APP_USR-3761795742121690-041220-837438fa2aa6e2d14509c582d6fa31cc-1067697249
+      - MP_CLIENT_ID=3761795742121690
+      - MP_CLIENT_SECRET=CZANuXiMqlDkNo8D47IPg4cvRvKScMsB
       - MP_REDIRECT_URI=https://api.arroyoseco.online/api/mercadopago/mp/callback
       - MP_API_URL=https://api.mercadopago.com
       - APP_URL=https://arroyoseco.online
