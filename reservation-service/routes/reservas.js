@@ -3,6 +3,11 @@ const router = express.Router();
 const reservaController = require('../controllers/reservaController');
 const { verifyToken, verifyAdmin, verifyoferente } = require('../middleware/auth');
 
+const injectOferenteIfNeeded = async (req, res, next) => {
+    if (req.user?.rol === 'oferente') return verifyoferente(req, res, next);
+    next();
+};
+
 // Public
 router.get('/disponibilidad', reservaController.verificarDisponibilidad);
 router.get('/recomendaciones/top-servicios', reservaController.getTopServicios);
@@ -13,12 +18,12 @@ router.get('/usuario/:usuarioId', verifyToken, reservaController.obtenerReservas
 router.get('/oferente/:oferenteId', verifyToken, verifyoferente, reservaController.obtenerReservasPorOferente);
 
 // Wildcard /:id last
-router.get('/:id', verifyToken, reservaController.obtenerReservaPorId);
+router.get('/:id', verifyToken, injectOferenteIfNeeded, reservaController.obtenerReservaPorId);
 
 router.post('/', verifyToken, reservaController.crearReserva);
-router.get('/', verifyToken, reservaController.obtenerReservas);
-router.put('/:id', verifyToken, reservaController.actualizarReserva);
-router.patch('/:id/estado', verifyToken, reservaController.cambiarEstado);
+router.get('/', verifyToken, injectOferenteIfNeeded, reservaController.obtenerReservas);
+router.put('/:id', verifyToken, injectOferenteIfNeeded, reservaController.actualizarReserva);
+router.patch('/:id/estado', verifyToken, injectOferenteIfNeeded, reservaController.cambiarEstado);
 router.delete('/:id', verifyToken, reservaController.eliminarReserva);
 
 module.exports = router;
