@@ -3,6 +3,7 @@ const Codigo2FA = require('../models/Codigo2FA');
 const emailService = require('../services/emailService');
 const jwt = require('jsonwebtoken');
 const { usuarioDTO, usuariosDTO } = require('../utils/dto');
+const redis = require('../utils/redis');
 
 // Allowed roles
 const ROLES_VALIDOS = ['turista', 'oferente', 'admin'];
@@ -150,11 +151,41 @@ exports.verify2FA = async (req, res, next) => {
             { expiresIn: '24h' }
         );
 
+        // Session tracking for Canary Deployments
+        const group = req.headers['x-frontend-version'] || 'stable';
+        const jwtTtlSeconds = 24 * 60 * 60; // 24 hours
+        // Normally tying to token involves an ID. We can use the hashed token signature, or just randomly generate a session ID. 
+        // JWT itself is the key or we can track by user ID. Let's use user ID combined with a prefix.
+        const tokenId = usuario.id_usuario; 
+        await redis.setex(`session:${tokenId}`, jwtTtlSeconds, group);
+        await redis.sadd(`active:${group}`, tokenId);
+        await redis.expire(`active:${group}`, jwtTtlSeconds);
+
         res.json({
             message: 'Autenticación exitosa',
             token: token,
             user: usuarioDTO(usuario)
         });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// LOGOUT - Clear session tracking
+exports.logoutUsuario = async (req, res, next) => {
+    try {
+        if (!req.user || !req.user.id) {
+             return res.status(401).json({ error: 'No autenticado' });
+        }
+        
+        const tokenId = req.user.id;
+        const group = await redis.get(`session:${tokenId}`);
+        if (group) {
+            await redis.srem(`active:${group}`, tokenId);
+        }
+        await redis.del(`session:${tokenId}`);
+
+        res.json({ message: 'Sesión finalizada exitosamente' });
     } catch (error) {
         next(error);
     }

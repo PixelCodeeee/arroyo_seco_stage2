@@ -2,6 +2,15 @@ version: '3.8'
 
 services:
   # ─────────────────────────────────────────
+  # INFRASTRUCTURE STACK
+  # ─────────────────────────────────────────
+  redis-shared:
+    image: redis:7-alpine
+    restart: always
+    ports:
+      - "6379:6379"
+
+  # ─────────────────────────────────────────
   # STABLE STACK (your current production)
   # ─────────────────────────────────────────
   api-gateway-stable:
@@ -35,6 +44,7 @@ services:
       - DB_NAME=arroyo_seco
       - PORT=5001
       - JWT_SECRET=AlphaPrime.2026
+      - REDIS_URL=redis://redis-shared:6379
 
   catalog-service-stable:
     image: ghcr.io/pixelcodeeee/arroyo_seco_stage2/catalog-service:stable
@@ -103,6 +113,7 @@ services:
       - DB_NAME=arroyo_seco
       - PORT=5006
       - JWT_SECRET=AlphaPrime.2026
+      - REDIS_URL=redis://redis-shared:6379
 
   # ─────────────────────────────────────────
   # CANARY STACK (your new version under test)
@@ -139,6 +150,7 @@ services:
       - DB_NAME=arroyo_seco
       - PORT=5101
       - JWT_SECRET=AlphaPrime.2026
+      - REDIS_URL=redis://redis-shared:6379
 
   catalog-service-canary:
     image: ghcr.io/pixelcodeeee/arroyo_seco_stage2/catalog-service:canary
@@ -207,6 +219,7 @@ services:
       - DB_NAME=arroyo_seco
       - PORT=5106
       - JWT_SECRET=AlphaPrime.2026
+      - REDIS_URL=redis://redis-shared:6379
 
   # ─────────────────────────────────────────
   # OBSERVABILITY STACK

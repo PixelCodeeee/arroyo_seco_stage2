@@ -1,0 +1,95 @@
+name: 1 · Deploy Canary
+
+on:
+  push:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ghcr.io/pixelcodeeee/arroyo_seco_stage2
+  PROJECT_ID: beta-prime-489121
+  ZONE: us-central1-a
+  SERVICES: >-
+    api-gateway auth-service catalog-service order-service
+    reservation-service payment-service announcements-service
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        service:
+          - api-gateway
+          - auth-service
+          - catalog-service
+          - order-service
+          - reservation-service
+          - payment-service
+          - announcements-service
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v5
+        with:
+          context: ./${{ matrix.service }}
+          push: true
+          tags: ${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:canary
+
+  deploy-and-route:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Checkout Ops Repository
+        uses: actions/checkout@v4
+        with:
+          repository: PixelCodeeee/arroyo-ops
+          path: ops
+          token: ${{ secrets.GH_PAT }}
+
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GCP_IAP_CREDENTIALS }}'
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Sync compose file to VM
+        run: |
+          gcloud compute scp docker-compose.yml joshualuna@private-backend-vm:/home/joshualuna/arroyo_seco_stage2/docker-compose.yml \
+            --zone=${{ env.ZONE }} \
+            --tunnel-through-iap \
+            --project=${{ env.PROJECT_ID }}
+
+      - name: Pull and restart canary stack
+        run: |
+          gcloud compute ssh joshualuna@private-backend-vm \
+            --zone=${{ env.ZONE }} \
+            --tunnel-through-iap \
+            --project=${{ env.PROJECT_ID }} \
+            --command="
+              echo '${{ secrets.GH_PAT }}' | docker login ghcr.io -u itsjluna --password-stdin
+              cd /home/joshualuna/arroyo_seco_stage2
+
+              docker compose pull \
+                api-gateway-canary auth-service-canary catalog-service-canary \
+                order-service-canary reservation-service-canary \
+                payment-service-canary announcements-service-canary
+
+              docker compose up -d --no-deps \
+                api-gateway-canary auth-service-canary catalog-service-canary \
+                order-service-canary reservation-service-canary \
+                payment-service-canary announcements-service-canary
+
+              docker system prune -a -f
+              sudo find /var/lib/docker/containers/ -type f -name '*.log' -exec truncate -s 0 {} +
+            "

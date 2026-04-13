@@ -6,6 +6,7 @@ const prisma = require('./config/db');
 const { verifyAdmin } = require('./middleware/auth');
 const { reservationLimiter } = require('./middleware/rateLimiter');
 const errorHandler = require('./middleware/errorHandler');
+const redis = require('./utils/redis');
 
 const app = express();
 const allowedOrigins = process.env.NODE_ENV === 'production' ? ['https://arroyoseco.online'] : ['https://arroyoseco.online', 'http://localhost:5173'];
@@ -18,6 +19,21 @@ app.use(express.json());
 app.use('/api', reservationLimiter); // Protect everything against spam
 
 const PORT = process.env.PORT || 5006;
+
+app.get('/api/announcements/maintenance', async (req, res, next) => {
+    try {
+        const group = req.headers['x-frontend-version'] || 'stable';
+        const message = await redis.get(`maintenance:announcement:${group}`);
+        
+        if (message) {
+            res.json({ show_banner: true, message });
+        } else {
+            res.json({ show_banner: false, message: null });
+        }
+    } catch (error) {
+        next(error);
+    }
+});
 
 app.get('/api/announcements', async (req, res, next) => {
     try {

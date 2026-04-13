@@ -21,6 +21,7 @@ app.use('/api/usuarios', reservationLimiter);
 
 // Routes
 app.use('/api/usuarios', require('./routes/usuarios'));
+app.use('/internal', require('./routes/internals'));
 
 // Health check
 app.get('/health', (req, res) => {

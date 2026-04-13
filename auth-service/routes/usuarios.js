@@ -12,6 +12,7 @@ router.post('/forgot-password', usuarioController.forgotPassword);
 router.post('/reset-password', usuarioController.resetPassword);
 
 // Protected routes
+router.post('/logout', verifyToken, usuarioController.logoutUsuario);
 router.put('/:id/password', verifyToken, usuarioController.updatePassword);
 router.get('/', verifyToken, verifyAdmin, usuarioController.obtenerUsuarios);
 router.get('/:id', verifyToken, usuarioController.obtenerUsuarioPorId);
