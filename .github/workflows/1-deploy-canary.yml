@@ -63,33 +63,63 @@ jobs:
 
       - uses: google-github-actions/setup-gcloud@v2
 
+      # FIX: SCP to /tmp first, then SSH to move it and fix permissions
       - name: Sync compose file to VM
         run: |
-          gcloud compute scp docker-compose.yml joshualuna@private-backend-vm:/home/joshualuna/arroyo_seco_stage2/docker-compose.yml \
+          gcloud compute scp docker-compose.yml private-backend-vm:/tmp/docker-compose.yml \
             --zone=${{ env.ZONE }} \
             --tunnel-through-iap \
             --project=${{ env.PROJECT_ID }}
 
+          gcloud compute ssh private-backend-vm \
+            --zone=${{ env.ZONE }} \
+            --tunnel-through-iap \
+            --project=${{ env.PROJECT_ID }} \
+            --command="sudo mkdir -p /home/joshualuna/arroyo_seco_stage2 && sudo mv /tmp/docker-compose.yml /home/joshualuna/arroyo_seco_stage2/docker-compose.yml && sudo chown joshualuna:joshualuna /home/joshualuna/arroyo_seco_stage2/docker-compose.yml"
+
       - name: Pull and restart canary stack
         run: |
-          gcloud compute ssh joshualuna@private-backend-vm \
+          gcloud compute ssh private-backend-vm \
             --zone=${{ env.ZONE }} \
             --tunnel-through-iap \
             --project=${{ env.PROJECT_ID }} \
             --command="
-              echo '${{ secrets.GH_PAT }}' | docker login ghcr.io -u itsjluna --password-stdin
+              echo '${{ secrets.GH_PAT }}' | sudo docker login ghcr.io -u itsjluna --password-stdin
               cd /home/joshualuna/arroyo_seco_stage2
 
-              docker compose pull \
+              sudo docker compose pull \
                 api-gateway-canary auth-service-canary catalog-service-canary \
                 order-service-canary reservation-service-canary \
                 payment-service-canary announcements-service-canary
 
-              docker compose up -d --no-deps \
+              sudo docker compose up -d --no-deps \
                 api-gateway-canary auth-service-canary catalog-service-canary \
                 order-service-canary reservation-service-canary \
                 payment-service-canary announcements-service-canary
 
-              docker system prune -a -f
+              sudo docker system prune -a -f
               sudo find /var/lib/docker/containers/ -type f -name '*.log' -exec truncate -s 0 {} +
             "
+
+      # NEW: Ensure the Ops repo knows this backend is ready for the cutover
+      - name: Sync with Ops Repository
+        run: |
+          cd ops
+          mkdir -p manifests
+          
+          # Initialize file if it doesn't exist
+          if [ ! -f manifests/canary.json ]; then
+            echo '{"api_contract": "v1", "frontend": {"status": "missing"}, "backend": {"status": "missing"}}' > manifests/canary.json
+          fi
+          
+          # Update the backend section of the canary manifest
+          jq --arg commit "${{ github.sha }}" \
+             --arg built_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+             '.backend.commit = $commit | .backend.built_at = $built_at | .backend.status = "ready"' \
+             manifests/canary.json > tmp.json && mv tmp.json manifests/canary.json
+             
+          git config user.email "ci@arroyoseco.online"
+          git config user.name "CI Bot"
+          git add manifests/canary.json
+          git commit -m "canary sync: backend ready @ ${{ github.sha }}" || echo "No changes to commit"
+          git push origin HEAD
