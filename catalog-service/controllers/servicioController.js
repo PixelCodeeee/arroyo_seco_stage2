@@ -129,10 +129,27 @@ exports.actualizarServicio = async (req, res, next) => {
         if (!servicio) return res.status(404).json({ error: "Servicio no encontrado" });
 
         // Authorization check. IDOR prevention.
-        if (req.user && req.user.rol === 'oferente') {
-            const oferenteUser = await Oferente.findByUserId(req.user.id);
-            if (!oferenteUser || oferenteUser.id_oferente !== servicio.id_oferente) {
-                return res.status(403).json({ error: "No autorizado para modificar servicios de otros oferentes" });
+        if (req.user) {
+            if (req.user.rol === 'admin') {
+                // Admin puede modificar cualquier servicio
+            }
+            else if (req.user.rol === 'oferente') {
+                const oferenteUser = await Oferente.findByUserId(req.user.id);
+
+                if (!oferenteUser) {
+                    return res.status(403).json({
+                        error: "Debes crear un perfil de oferente"
+                    });
+                }
+
+                if (oferenteUser.id_oferente !== servicio.id_oferente) {
+                    return res.status(403).json({
+                        error: "No autorizado para modificar servicios de otros oferentes"
+                    });
+                }
+            }
+            else {
+                return res.status(403).json({ error: "No autorizado" });
             }
         }
 

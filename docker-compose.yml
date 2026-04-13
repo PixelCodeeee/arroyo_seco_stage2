@@ -1,83 +1,84 @@
 version: '3.8'
 
 services:
-  # 1.  API Gateway - joshualuna
-  api-gateway:
-    build: ./api-gateway
+  # ─────────────────────────────────────────
+  # STABLE STACK (your current production)
+  # ─────────────────────────────────────────
+  api-gateway-stable:
+    image: ghcr.io/itsjluna/arroyo-seco/api-gateway:stable
     restart: always
     ports:
-      - "5000:5000"
+      - "5000:5000" # Still reachable directly for debugging
     depends_on:
-      - auth-service
-      - catalog-service
-      - order-service
-      - reservation-service
-      - payment-service
-      - announcements-service
+      - auth-service-stable
+      - catalog-service-stable
+      - order-service-stable
+      - reservation-service-stable
+      - payment-service-stable
+      - announcements-service-stable
     environment:
-      - AUTH_SERVICE_URL=http://auth-service:5001
-      - CATALOG_SERVICE_URL=http://catalog-service:5002
-      - ORDER_SERVICE_URL=http://order-service:5003
-      - RESERVATION_SERVICE_URL=http://reservation-service:5004
-      - PAYMENT_SERVICE_URL=http://payment-service:5005
-      - ANNOUNCEMENTS_SERVICE_URL=http://announcements-service:5006
+      - AUTH_SERVICE_URL=http://auth-service-stable:5001
+      - CATALOG_SERVICE_URL=http://catalog-service-stable:5002
+      - ORDER_SERVICE_URL=http://order-service-stable:5003
+      - RESERVATION_SERVICE_URL=http://reservation-service-stable:5004
+      - PAYMENT_SERVICE_URL=http://payment-service-stable:5005
+      - ANNOUNCEMENTS_SERVICE_URL=http://announcements-service-stable:5006
 
-  # 2.  Internal Microservices
-  auth-service:
-    build: ./auth-service
+  auth-service-stable:
+    image: ghcr.io/itsjluna/arroyo-seco/auth-service:stable
     restart: always
     environment:
       - NODE_ENV=production
-      - DB_HOST=10.223.32.3 # Cloud SQL Private IP
+      - DB_HOST=10.223.32.3
       - DB_USER=db_user
       - DB_PASSWORD=arroyo_password
       - DB_NAME=arroyo_seco
       - PORT=5001
       - JWT_SECRET=AlphaPrime.2026
 
-  catalog-service:
-    build: ./catalog-service
+  catalog-service-stable:
+    image: ghcr.io/itsjluna/arroyo-seco/catalog-service:stable
     restart: always
     environment:
       - NODE_ENV=production
-      - DB_HOST=10.223.32.3 # Cloud SQL Private IP
+      - DB_HOST=10.223.32.3
       - DB_USER=db_user
       - DB_PASSWORD=arroyo_password
       - DB_NAME=arroyo_seco
       - PORT=5002
       - JWT_SECRET=AlphaPrime.2026
 
-  order-service:
-    build: ./order-service
+  order-service-stable:
+    image: ghcr.io/itsjluna/arroyo-seco/order-service:stable
     restart: always
     environment:
       - NODE_ENV=production
-      - DB_HOST=10.223.32.3 # Cloud SQL Private IP
+      - DB_HOST=10.223.32.3
       - DB_USER=db_user
       - DB_PASSWORD=arroyo_password
       - DB_NAME=arroyo_seco
       - PORT=5003
       - JWT_SECRET=AlphaPrime.2026
 
-  reservation-service:
-    build: ./reservation-service
+  reservation-service-stable:
+    image: ghcr.io/itsjluna/arroyo-seco/reservation-service:stable
     restart: always
     environment:
       - NODE_ENV=production
-      - DB_HOST=10.223.32.3 # Cloud SQL Private IP
+      - DB_HOST=10.223.32.3
       - DB_USER=db_user
       - DB_PASSWORD=arroyo_password
       - DB_NAME=arroyo_seco
       - PORT=5004
       - JWT_SECRET=AlphaPrime.2026
-      - CATALOG_SERVICE_URL=http://catalog-service:5002
+      - CATALOG_SERVICE_URL=http://catalog-service-stable:5002
 
-  payment-service:
-    build: ./payment-service
+  payment-service-stable:
+    image: ghcr.io/itsjluna/arroyo-seco/payment-service:stable
     restart: always
     environment:
       - NODE_ENV=production
-      - DB_HOST=10.223.32.3 # Cloud SQL Private IP
+      - DB_HOST=10.223.32.3
       - DB_USER=db_user
       - DB_PASSWORD=arroyo_password
       - DB_NAME=arroyo_seco
@@ -91,14 +92,145 @@ services:
       - MP_API_URL=https://api.mercadopago.com
       - APP_URL=https://arroyoseco.online
 
-  announcements-service:
-    build: ./announcements-service
+  announcements-service-stable:
+    image: ghcr.io/itsjluna/arroyo-seco/announcements-service:stable
     restart: always
     environment:
       - NODE_ENV=production
-      - DB_HOST=10.223.32.3 # Cloud SQL Private IP
+      - DB_HOST=10.223.32.3
       - DB_USER=db_user
       - DB_PASSWORD=arroyo_password
       - DB_NAME=arroyo_seco
       - PORT=5006
       - JWT_SECRET=AlphaPrime.2026
+
+  # ─────────────────────────────────────────
+  # CANARY STACK (your new version under test)
+  # All internal ports offset by +100
+  # ─────────────────────────────────────────
+  api-gateway-canary:
+    image: ghcr.io/itsjluna/arroyo-seco/api-gateway:canary
+    restart: always
+    ports:
+      - "5100:5000" # Exposed on 5100 for direct debugging
+    depends_on:
+      - auth-service-canary
+      - catalog-service-canary
+      - order-service-canary
+      - reservation-service-canary
+      - payment-service-canary
+      - announcements-service-canary
+    environment:
+      - AUTH_SERVICE_URL=http://auth-service-canary:5101
+      - CATALOG_SERVICE_URL=http://catalog-service-canary:5102
+      - ORDER_SERVICE_URL=http://order-service-canary:5103
+      - RESERVATION_SERVICE_URL=http://reservation-service-canary:5104
+      - PAYMENT_SERVICE_URL=http://payment-service-canary:5105
+      - ANNOUNCEMENTS_SERVICE_URL=http://announcements-service-canary:5106
+
+  auth-service-canary:
+    image: ghcr.io/itsjluna/arroyo-seco/auth-service:canary
+    restart: always
+    environment:
+      - NODE_ENV=production
+      - DB_HOST=10.223.32.3
+      - DB_USER=db_user
+      - DB_PASSWORD=arroyo_password
+      - DB_NAME=arroyo_seco
+      - PORT=5101
+      - JWT_SECRET=AlphaPrime.2026
+
+  catalog-service-canary:
+    image: ghcr.io/itsjluna/arroyo-seco/catalog-service:canary
+    restart: always
+    environment:
+      - NODE_ENV=production
+      - DB_HOST=10.223.32.3
+      - DB_USER=db_user
+      - DB_PASSWORD=arroyo_password
+      - DB_NAME=arroyo_seco
+      - PORT=5102
+      - JWT_SECRET=AlphaPrime.2026
+
+  order-service-canary:
+    image: ghcr.io/itsjluna/arroyo-seco/order-service:canary
+    restart: always
+    environment:
+      - NODE_ENV=production
+      - DB_HOST=10.223.32.3
+      - DB_USER=db_user
+      - DB_PASSWORD=arroyo_password
+      - DB_NAME=arroyo_seco
+      - PORT=5103
+      - JWT_SECRET=AlphaPrime.2026
+
+  reservation-service-canary:
+    image: ghcr.io/itsjluna/arroyo-seco/reservation-service:canary
+    restart: always
+    environment:
+      - NODE_ENV=production
+      - DB_HOST=10.223.32.3
+      - DB_USER=db_user
+      - DB_PASSWORD=arroyo_password
+      - DB_NAME=arroyo_seco
+      - PORT=5104
+      - JWT_SECRET=AlphaPrime.2026
+      - CATALOG_SERVICE_URL=http://catalog-service-canary:5102
+
+  payment-service-canary:
+    image: ghcr.io/itsjluna/arroyo-seco/payment-service:canary
+    restart: always
+    environment:
+      - NODE_ENV=production
+      - DB_HOST=10.223.32.3
+      - DB_USER=db_user
+      - DB_PASSWORD=arroyo_password
+      - DB_NAME=arroyo_seco
+      - PORT=5105
+      - JWT_SECRET=AlphaPrime.2026
+      - MP_PUBLIC_KEY=APP_USR-12542022-ac74-4da7-8bc4-a95ba5b62314
+      - MP_ACCESS_TOKEN=APP_USR-3761795742121690-041220-837438fa2aa6e2d14509c582d6fa31cc-1067697249
+      - MP_CLIENT_ID=3761795742121690
+      - MP_CLIENT_SECRET=CZANuXiMqlDkNo8D47IPg4cvRvKScMsB
+      - MP_REDIRECT_URI=https://api.arroyoseco.online/api/mercadopago/mp/callback
+      - MP_API_URL=https://api.mercadopago.com
+      - APP_URL=https://arroyoseco.online
+
+  announcements-service-canary:
+    image: ghcr.io/itsjluna/arroyo-seco/announcements-service:canary
+    restart: always
+    environment:
+      - NODE_ENV=production
+      - DB_HOST=10.223.32.3
+      - DB_USER=db_user
+      - DB_PASSWORD=arroyo_password
+      - DB_NAME=arroyo_seco
+      - PORT=5106
+      - JWT_SECRET=AlphaPrime.2026
+
+  # ─────────────────────────────────────────
+  # OBSERVABILITY STACK
+  # ─────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:latest
+    restart: always
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=15d'
+
+  grafana:
+    image: grafana/grafana-oss:latest
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=your_secure_password
+    volumes:
+      - grafana-data:/var/lib/grafana
+
+volumes:
+  grafana-data:
