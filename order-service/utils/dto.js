@@ -27,16 +27,23 @@ const pedidoDTO = (pedido) => {
     return {
         id_pedido: pedido.id_pedido,
         id_usuario: pedido.id_usuario,
-        fecha_pedido: pedido.fecha_pedido,
+        nombre_usuario: pedido.nombre_usuario,
+        email_usuario: pedido.email_usuario,
+        fecha_pedido: pedido.fecha_creacion,      // ← corregido
         estado: pedido.estado,
-        total: pedido.total,
-        direccion_envio: pedido.direccion_envio,
-        detalles: pedido.detalles ? pedido.detalles.map(d => ({
-             id_detalle: d.id_detalle,
-             id_producto: d.id_producto,
-             cantidad: d.cantidad,
-             precio_unitario: d.precio_unitario
-        })) : undefined
+        metodo_pago: pedido.metodo_pago,
+        total: pedido.monto_total,                // ← corregido
+        total_items: pedido.total_items,
+        items: pedido.items ? pedido.items.map(d => ({
+            id_item_pedido: d.id_item_pedido,
+            id_producto: d.id_producto,
+            cantidad: d.cantidad,
+            precio_unitario: d.precio_compra,     // ← corregido
+            nombre_producto: d.nombre_producto,
+            descripcion_producto: d.descripcion_producto,
+            imagenes_producto: d.imagenes_producto,
+            nombre_oferente: d.nombre_oferente
+        })) : []
     };
 };
 
