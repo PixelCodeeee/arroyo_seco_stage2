@@ -5,7 +5,7 @@ services:
   # STABLE STACK (your current production)
   # ─────────────────────────────────────────
   api-gateway-stable:
-    image: ghcr.io/itsjluna/arroyo_seco_stage2/api-gateway:stable
+    image: ghcr.io/pixelcodeeee/arroyo_seco_stage2/api-gateway:stable
     restart: always
     ports:
       - "5000:5000" # Still reachable directly for debugging
@@ -25,7 +25,7 @@ services:
       - ANNOUNCEMENTS_SERVICE_URL=http://announcements-service-stable:5006
 
   auth-service-stable:
-    image: ghcr.io/itsjluna/arroyo_seco_stage2/auth-service:stable
+    image: ghcr.io/pixelcodeeee/arroyo_seco_stage2/auth-service:stable
     restart: always
     environment:
       - NODE_ENV=production
@@ -37,7 +37,7 @@ services:
       - JWT_SECRET=AlphaPrime.2026
 
   catalog-service-stable:
-    image: ghcr.io/itsjluna/arroyo_seco_stage2/catalog-service:stable
+    image: ghcr.io/pixelcodeeee/arroyo_seco_stage2/catalog-service:stable
     restart: always
     environment:
       - NODE_ENV=production
@@ -49,7 +49,7 @@ services:
       - JWT_SECRET=AlphaPrime.2026
 
   order-service-stable:
-    image: ghcr.io/itsjluna/arroyo_seco_stage2/order-service:stable
+    image: ghcr.io/pixelcodeeee/arroyo_seco_stage2/order-service:stable
     restart: always
     environment:
       - NODE_ENV=production
@@ -61,7 +61,7 @@ services:
       - JWT_SECRET=AlphaPrime.2026
 
   reservation-service-stable:
-    image: ghcr.io/itsjluna/arroyo_seco_stage2/reservation-service:stable
+    image: ghcr.io/pixelcodeeee/arroyo_seco_stage2/reservation-service:stable
     restart: always
     environment:
       - NODE_ENV=production
@@ -74,7 +74,7 @@ services:
       - CATALOG_SERVICE_URL=http://catalog-service-stable:5002
 
   payment-service-stable:
-    image: ghcr.io/itsjluna/arroyo_seco_stage2/payment-service:stable
+    image: ghcr.io/pixelcodeeee/arroyo_seco_stage2/payment-service:stable
     restart: always
     environment:
       - NODE_ENV=production
@@ -93,7 +93,7 @@ services:
       - APP_URL=https://arroyoseco.online
 
   announcements-service-stable:
-    image: ghcr.io/itsjluna/arroyo_seco_stage2/announcements-service:stable
+    image: ghcr.io/pixelcodeeee/arroyo_seco_stage2/announcements-service:stable
     restart: always
     environment:
       - NODE_ENV=production
@@ -109,7 +109,7 @@ services:
   # All internal ports offset by +100
   # ─────────────────────────────────────────
   api-gateway-canary:
-    image: ghcr.io/itsjluna/arroyo_seco_stage2/api-gateway:canary
+    image: ghcr.io/pixelcodeeee/arroyo_seco_stage2/api-gateway:canary
     restart: always
     ports:
       - "5100:5000" # Exposed on 5100 for direct debugging
@@ -129,7 +129,7 @@ services:
       - ANNOUNCEMENTS_SERVICE_URL=http://announcements-service-canary:5106
 
   auth-service-canary:
-    image: ghcr.io/itsjluna/arroyo_seco_stage2/auth-service:canary
+    image: ghcr.io/pixelcodeeee/arroyo_seco_stage2/auth-service:canary
     restart: always
     environment:
       - NODE_ENV=production
@@ -141,7 +141,7 @@ services:
       - JWT_SECRET=AlphaPrime.2026
 
   catalog-service-canary:
-    image: ghcr.io/itsjluna/arroyo_seco_stage2/catalog-service:canary
+    image: ghcr.io/pixelcodeeee/arroyo_seco_stage2/catalog-service:canary
     restart: always
     environment:
       - NODE_ENV=production
@@ -153,7 +153,7 @@ services:
       - JWT_SECRET=AlphaPrime.2026
 
   order-service-canary:
-    image: ghcr.io/itsjluna/arroyo_seco_stage2/order-service:canary
+    image: ghcr.io/pixelcodeeee/arroyo_seco_stage2/order-service:canary
     restart: always
     environment:
       - NODE_ENV=production
@@ -165,7 +165,7 @@ services:
       - JWT_SECRET=AlphaPrime.2026
 
   reservation-service-canary:
-    image: ghcr.io/itsjluna/arroyo_seco_stage2/reservation-service:canary
+    image: ghcr.io/pixelcodeeee/arroyo_seco_stage2/reservation-service:canary
     restart: always
     environment:
       - NODE_ENV=production
@@ -178,7 +178,7 @@ services:
       - CATALOG_SERVICE_URL=http://catalog-service-canary:5102
 
   payment-service-canary:
-    image: ghcr.io/itsjluna/arroyo_seco_stage2/payment-service:canary
+    image: ghcr.io/pixelcodeeee/arroyo_seco_stage2/payment-service:canary
     restart: always
     environment:
       - NODE_ENV=production
@@ -197,7 +197,7 @@ services:
       - APP_URL=https://arroyoseco.online
 
   announcements-service-canary:
-    image: ghcr.io/itsjluna/arroyo_seco_stage2/announcements-service:canary
+    image: ghcr.io/pixelcodeeee/arroyo_seco_stage2/announcements-service:canary
     restart: always
     environment:
       - NODE_ENV=production

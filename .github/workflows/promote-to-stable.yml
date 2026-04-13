@@ -9,7 +9,7 @@ on:
         default: 'all'
 
 env:
-  IMAGE_PREFIX: ghcr.io/itsjluna/arroyo_seco_stage2
+  IMAGE_PREFIX: ghcr.io/pixelcodeeee/arroyo_seco_stage2
 
 jobs:
   promote:

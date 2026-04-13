@@ -6,7 +6,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_PREFIX: ghcr.io/itsjluna/arroyo_seco_stage2
+  IMAGE_PREFIX: ghcr.io/pixelcodeeee/arroyo_seco_stage2
   PROJECT_ID: beta-prime-489121 # 👈 Pulled from your terminal output
   ZONE: us-central1-a # Update if your VM is in a different zone
 
