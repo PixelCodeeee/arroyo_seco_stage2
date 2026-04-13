@@ -9,7 +9,7 @@ router.post('/', verifyToken, pedidoController.crearPedido);
 
 // Admin routes
 router.get('/', verifyToken, pedidoController.obtenerPedidos);
-router.patch('/:id/estado', verifyToken, verifyAdmin, pedidoController.cambiarEstado);
+router.patch('/:id/estado', verifyToken, pedidoController.cambiarEstado);
 router.delete('/:id', verifyToken, verifyAdmin, pedidoController.eliminarPedido);
 
 // User routes

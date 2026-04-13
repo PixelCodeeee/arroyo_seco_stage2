@@ -13,12 +13,12 @@ router.get('/usuario/:usuarioId', verifyToken, reservaController.obtenerReservas
 router.get('/oferente/:oferenteId', verifyToken, verifyoferente, reservaController.obtenerReservasPorOferente);
 
 // Wildcard /:id last
-router.get('/:id', verifyToken, verifyoferente, reservaController.obtenerReservaPorId);
+router.get('/:id', verifyToken, reservaController.obtenerReservaPorId);
 
 router.post('/', verifyToken, reservaController.crearReserva);
-router.get('/', verifyToken, verifyoferente, reservaController.obtenerReservas);
+router.get('/', verifyToken, reservaController.obtenerReservas);
 router.put('/:id', verifyToken, reservaController.actualizarReserva);
-router.patch('/:id/estado', verifyToken, verifyoferente, reservaController.cambiarEstado);
+router.patch('/:id/estado', verifyToken, reservaController.cambiarEstado);
 router.delete('/:id', verifyToken, reservaController.eliminarReserva);
 
 module.exports = router;

@@ -23,7 +23,7 @@ exports.crearPedido = async (req, res, next) => {
 
         // Authorization check - IDOR prevention. A user can only create an order for themselves.
         if (req.user && req.user.rol === 'turista' && req.user.id !== id_usuario) {
-             return res.status(403).json({ error: "No autorizado a crear pedidos para otro usuario" });
+            return res.status(403).json({ error: "No autorizado a crear pedidos para otro usuario" });
         }
 
         if (isNaN(monto_total) || monto_total <= 0) {
@@ -92,7 +92,7 @@ exports.crearPedido = async (req, res, next) => {
 exports.obtenerPedidos = async (req, res, next) => {
     try {
         if (!req.user) {
-             return res.status(401).json({ error: 'No autenticado' });
+            return res.status(401).json({ error: 'No autenticado' });
         }
 
         let pedidos = [];
@@ -109,12 +109,12 @@ exports.obtenerPedidos = async (req, res, next) => {
                 const { prisma } = require('../config/db');
                 const oferentes = await prisma.oferente.findMany({ where: { id_usuario: req.user.id } });
                 if (oferentes.length > 0) {
-                     pedidos = await Pedido.findByOferenteId(oferentes[0].id_oferente);
-                     stats = await Pedido.getStatsByOferente(oferentes[0].id_oferente);
+                    pedidos = await Pedido.findByOferenteId(oferentes[0].id_oferente);
+                    stats = await Pedido.getStatsByOferente(oferentes[0].id_oferente);
                 }
             } else {
-                 pedidos = await Pedido.findByOferenteId(req.user.oferenteId);
-                 stats = await Pedido.getStatsByOferente(req.user.oferenteId);
+                pedidos = await Pedido.findByOferenteId(req.user.oferenteId);
+                stats = await Pedido.getStatsByOferente(req.user.oferenteId);
             }
         }
 
@@ -146,7 +146,7 @@ exports.obtenerPedidoPorId = async (req, res, next) => {
         }
 
         if (req.user && req.user.rol === 'oferente' && pedido.id_oferente !== req.user.oferenteId) {
-             return res.status(403).json({ error: "No autorizado para ver este pedido de otro oferente" });
+            return res.status(403).json({ error: "No autorizado para ver este pedido de otro oferente" });
         }
 
         res.json(pedidoDTO(pedido));
@@ -162,7 +162,7 @@ exports.obtenerPedidosPorUsuario = async (req, res, next) => {
         if (isNaN(usuarioId)) return res.status(400).json({ error: 'ID de usuario inválido' });
 
         if (req.user && req.user.rol === 'turista' && req.user.id !== usuarioId) {
-             return res.status(403).json({ error: 'No autorizado' });
+            return res.status(403).json({ error: 'No autorizado' });
         }
 
         const pedidos = await Pedido.findByUsuarioId(usuarioId);
@@ -183,7 +183,7 @@ exports.obtenerPedidosPorOferente = async (req, res, next) => {
         if (isNaN(oferenteId)) return res.status(400).json({ error: 'ID de oferente inválido' });
 
         if (req.user && req.user.rol === 'oferente' && req.user.oferenteId !== oferenteId) {
-             return res.status(403).json({ error: 'No autorizado' });
+            return res.status(403).json({ error: 'No autorizado' });
         }
 
         const pedidos = await Pedido.findByOferenteId(oferenteId);
@@ -228,24 +228,47 @@ exports.cambiarEstado = async (req, res, next) => {
         const id = parseInt(req.params.id, 10);
         if (isNaN(id)) return res.status(400).json({ error: 'ID de pedido inválido' });
 
-        if (!estado) {
-            return res.status(400).json({ error: "El estado es requerido" });
-        }
+        if (!estado) return res.status(400).json({ error: "El estado es requerido" });
 
-        const estadosValidos = ['pendiente', 'pagado', 'enviado'];
+        const estadosValidos = ['pendiente', 'pagado', 'enviado', 'completado'];
         if (!estadosValidos.includes(estado)) {
-            return res.status(400).json({ error: "Estado inválido. Valores permitidos: pendiente, pagado, enviado" });
+            return res.status(400).json({ error: "Estado inválido" });
         }
 
         const pedidoOriginal = await Pedido.findById(id);
         if (!pedidoOriginal) return res.status(404).json({ error: "Pedido no encontrado" });
 
-        // Admin mapping assuming it's valid
-        // Actually, who changes status? Usually admin or webhooks. If we leave it open, let's at least enforce standard checks.
-        // Assuming admin middleware wraps this controller.
+        // IDOR check
+        if (req.user.rol === 'turista') {
+            return res.status(403).json({ error: "Turistas no pueden cambiar estado de pedidos" });
+        }
+
+        if (req.user.rol === 'oferente') {
+            // Verificar que el pedido contiene productos del oferente
+            const { prisma } = require('../config/db');
+            const oferentes = await prisma.oferente.findMany({ where: { id_usuario: req.user.id } });
+            if (oferentes.length === 0) return res.status(403).json({ error: "No autorizado" });
+
+            const oferenteId = req.user.oferenteId || oferentes[0].id_oferente;
+            const tieneProductos = pedidoOriginal.items?.some(
+                item => item.nombre_oferente && oferentes[0].nombre_negocio &&
+                    item.nombre_oferente === oferentes[0].nombre_negocio
+            );
+
+            // Safer: check via DB
+            const itemsDelOferente = await prisma.itemPedido.findFirst({
+                where: {
+                    id_pedido: id,
+                    producto: { id_oferente: oferenteId }
+                }
+            });
+
+            if (!itemsDelOferente) {
+                return res.status(403).json({ error: "No autorizado para modificar este pedido" });
+            }
+        }
 
         const pedido = await Pedido.updateEstado(id, estado);
-
         res.json({
             message: `Pedido actualizado a estado: ${estado}`,
             pedido: pedidoDTO(pedido)
@@ -266,11 +289,11 @@ exports.eliminarPedido = async (req, res, next) => {
         if (!pedidoOriginal) return res.status(404).json({ error: "Pedido no encontrado" });
 
         if (req.user && req.user.rol === 'turista' && pedidoOriginal.id_usuario !== req.user.id) {
-             return res.status(403).json({ error: "No autorizado para eliminar este pedido" });
+            return res.status(403).json({ error: "No autorizado para eliminar este pedido" });
         }
 
         if (req.user && req.user.rol === 'oferente') {
-             return res.status(403).json({ error: "Los oferentes no pueden eliminar pedidos" });
+            return res.status(403).json({ error: "Los oferentes no pueden eliminar pedidos" });
         }
 
         const deleted = await Pedido.delete(id);
