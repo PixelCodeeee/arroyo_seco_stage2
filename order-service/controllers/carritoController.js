@@ -2,10 +2,10 @@ const Carrito = require('../models/Carrito');
 const Producto = require('../models/Producto');
 const { carritoDTO, carritosDTO } = require('../utils/dto');
 
-// Obtener carrito del usuario
+// Obtener carrito del usuario, this is canary shit
 exports.getCarrito = async (req, res, next) => {
     try {
-        const id_usuario = req.user.id; 
+        const id_usuario = req.user.id;
 
         if (isNaN(id_usuario)) return res.status(400).json({ error: "Usuario ID inválido" });
 
@@ -36,7 +36,7 @@ exports.agregarAlCarrito = async (req, res, next) => {
         cantidad = parseInt(cantidad, 10);
 
         if (isNaN(id_producto) || isNaN(cantidad) || cantidad < 1) {
-             return res.status(400).json({ error: "id_producto y cantidad deben ser válidos" });
+            return res.status(400).json({ error: "id_producto y cantidad deben ser válidos" });
         }
 
         // Validar que el producto existe y está disponible
@@ -92,14 +92,14 @@ exports.actualizarCantidad = async (req, res, next) => {
                 message: 'ID o Cantidad inválida'
             });
         }
-        
+
         // Authorization logic for Carrito bounds
         const item = await Carrito.findById(id_carrito);
         if (!item) {
-             return res.status(404).json({ success: false, message: 'Item no encontrado' });
+            return res.status(404).json({ success: false, message: 'Item no encontrado' });
         }
         if (item.id_usuario !== req.user.id) {
-             return res.status(403).json({ success: false, message: 'No autorizado para modificar este carrito' });
+            return res.status(403).json({ success: false, message: 'No autorizado para modificar este carrito' });
         }
 
         const actualizado = await Carrito.updateCantidad(id_carrito, cantidad);
@@ -128,12 +128,12 @@ exports.eliminarItem = async (req, res, next) => {
 
         const item = await Carrito.findById(id_carrito);
         if (!item) {
-             return res.status(404).json({ success: false, message: 'Item no encontrado' });
+            return res.status(404).json({ success: false, message: 'Item no encontrado' });
         }
         if (item.id_usuario !== req.user.id) {
-             return res.status(403).json({ success: false, message: 'No autorizado para modificar este carrito' });
+            return res.status(403).json({ success: false, message: 'No autorizado para modificar este carrito' });
         }
-        
+
         const eliminado = await Carrito.removeItem(id_carrito);
 
         if (!eliminado) {

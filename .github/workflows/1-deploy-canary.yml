@@ -97,29 +97,31 @@ jobs:
                 order-service-canary reservation-service-canary \
                 payment-service-canary announcements-service-canary
 
+              echo "Waiting for containers to boot..."
+              sleep 10
+              
+              UNHEALTHY=$(sudo docker compose ps --format json | jq '\''[.[] | select(.Health == "unhealthy" or .State != "running")] | length'\'')
+              if [ "$UNHEALTHY" -gt 0 ]; then
+                echo "🚨 Containers not healthy, aborting manifest sync"
+                exit 1
+              fi
+
               sudo docker system prune -a -f
-              sudo find /var/lib/docker/containers/ -type f -name '*.log' -exec truncate -s 0 {} +
+              sudo find /var/lib/docker/containers/ -type f -name '\''*.log'\'' -exec truncate -s 0 {} +
             "
 
       # NEW: Ensure the Ops repo knows this backend is ready for the cutover
       - name: Sync with Ops Repository
         run: |
           cd ops
-          mkdir -p manifests
+          git pull --rebase origin HEAD || true
           
-          # Initialize file if it doesn't exist
-          if [ ! -f manifests/canary.json ]; then
-            echo '{"api_contract": "v1", "frontend": {"status": "missing"}, "backend": {"status": "missing"}}' > manifests/canary.json
-          fi
+          node scripts/sync.js backend "${{ github.sha }}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" || BLOCKED=1
           
-          # Update the backend section of the canary manifest
-          jq --arg commit "${{ github.sha }}" \
-             --arg built_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-             '.backend.commit = $commit | .backend.built_at = $built_at | .backend.status = "ready"' \
-             manifests/canary.json > tmp.json && mv tmp.json manifests/canary.json
-             
           git config user.email "ci@arroyoseco.online"
           git config user.name "CI Bot"
           git add manifests/canary.json
           git commit -m "canary sync: backend ready @ ${{ github.sha }}" || echo "No changes to commit"
           git push origin HEAD
+          
+          [ -z "$BLOCKED" ] || exit 1
