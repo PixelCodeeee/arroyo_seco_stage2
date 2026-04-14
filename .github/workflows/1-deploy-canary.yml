@@ -87,6 +87,7 @@ jobs:
               echo '${{ secrets.GH_PAT }}' | sudo docker login ghcr.io -u itsjluna --password-stdin
               cd /home/joshualuna/arroyo_seco_stage2
 
+              # Pull and update canary services
               sudo docker compose pull \
                 api-gateway-canary auth-service-canary catalog-service-canary \
                 order-service-canary reservation-service-canary \
@@ -97,17 +98,20 @@ jobs:
                 order-service-canary reservation-service-canary \
                 payment-service-canary announcements-service-canary
 
-              echo "Waiting for containers to boot..."
+              echo \"Waiting for containers to boot...\"
               sleep 10
               
-              UNHEALTHY=$(sudo docker compose ps --format json | jq '\''[.[] | select(.Health == "unhealthy" or .State != "running")] | length'\'')
-              if [ "$UNHEALTHY" -gt 0 ]; then
-                echo "🚨 Containers not healthy, aborting manifest sync"
+              # Use escaped double quotes for jq to avoid single-quote collisions
+              UNHEALTHY=\$(sudo docker compose ps --format json | jq '[.[] | select(.Health == \"unhealthy\" or .State != \"running\")] | length')
+              
+              if [ \"\$UNHEALTHY\" -gt 0 ]; then
+                echo \"🚨 Containers not healthy, aborting manifest sync\"
                 exit 1
               fi
 
+              # Clean up
               sudo docker system prune -a -f
-              sudo find /var/lib/docker/containers/ -type f -name '\''*.log'\'' -exec truncate -s 0 {} +
+              sudo find /var/lib/docker/containers/ -type f -name \"*.log\" -exec truncate -s 0 {} +
             "
 
       # NEW: Ensure the Ops repo knows this backend is ready for the cutover
