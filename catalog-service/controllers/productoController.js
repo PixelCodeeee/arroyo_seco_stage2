@@ -89,7 +89,19 @@ exports.crearProducto = async (req, res, next) => {
 
 exports.obtenerProductos = async (req, res, next) => {
     try {
-        const productos = await Producto.findAll();
+        let productos;
+
+        // If authenticated oferente, only return their own products
+        if (req.user && req.user.rol === 'oferente') {
+            const oferente = await Oferente.findByUserId(req.user.id);
+            if (!oferente) {
+                return res.status(403).json({ error: 'Perfil de oferente no encontrado' });
+            }
+            productos = await Producto.findByOferente(oferente.id_oferente);
+        } else {
+            productos = await Producto.findAll();
+        }
+
         const categorias = await Categoria.findAll();
         res.json({ productos: productosDTO(productos), categorias });
     } catch (err) {

@@ -1,12 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const servicioController = require('../controllers/servicioController');
-const { verifyToken, verifyoferente } = require('../middleware/auth');
+const { verifyToken, verifyoferente, optionalAuth } = require('../middleware/auth');
 
-// Public
-router.get('/', servicioController.obtenerServicios);
-router.get('/:id', servicioController.obtenerServicioPorId);
+// Public (with optional auth for oferente filtering)
+router.get('/', optionalAuth, servicioController.obtenerServicios);
 router.get('/oferente/:oferenteId', servicioController.obtenerServiciosPorOferente);
+router.get('/:id', servicioController.obtenerServicioPorId);
 
 // Protected
 router.post('/', verifyToken, verifyoferente, servicioController.crearServicio);

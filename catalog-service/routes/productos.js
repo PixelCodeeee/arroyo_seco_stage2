@@ -1,12 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const productoController = require('../controllers/productoController');
-const { verifyToken, verifyoferente } = require('../middleware/auth');
+const { verifyToken, verifyoferente, optionalAuth } = require('../middleware/auth');
 
-// Public
-router.get('/', productoController.obtenerProductos);
+// Public (with optional auth for oferente filtering)
+router.get('/', optionalAuth, productoController.obtenerProductos);
 router.get('/oferente/:oferenteId', productoController.obtenerProductosPorOferente);
-router.get('/mis-productos', verifyToken, verifyoferente, productoController.obtenerMisProductos); // ← moved up
+router.get('/mis-productos', verifyToken, verifyoferente, productoController.obtenerMisProductos);
 router.get('/:id', productoController.obtenerProducto);
 
 // Protected

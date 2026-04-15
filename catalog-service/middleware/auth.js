@@ -120,8 +120,23 @@ const verifyAdmin = (req, res, next) => {
     }
 };
 
+// Optional auth — sets req.user if a valid token is present, but does NOT reject if missing/invalid
+const optionalAuth = (req, res, next) => {
+    try {
+        const token = req.headers.authorization?.split(' ')[1];
+        if (token && process.env.JWT_SECRET) {
+            const decoded = jwt.verify(token, process.env.JWT_SECRET);
+            req.user = decoded;
+        }
+    } catch {
+        // Token invalid/expired — continue as unauthenticated
+    }
+    next();
+};
+
 module.exports = {
     verifyToken,
     verifyoferente,
-    verifyAdmin
+    verifyAdmin,
+    optionalAuth
 };

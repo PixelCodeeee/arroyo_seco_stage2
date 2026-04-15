@@ -62,7 +62,19 @@ exports.crearServicio = async (req, res, next) => {
 // traer los servicios
 exports.obtenerServicios = async (req, res, next) => {
     try {
-        const servicios = await ServicioRestaurante.findAll();
+        let servicios;
+
+        // If authenticated oferente, only return their own services
+        if (req.user && req.user.rol === 'oferente') {
+            const oferente = await Oferente.findByUserId(req.user.id);
+            if (!oferente) {
+                return res.status(403).json({ error: 'Perfil de oferente no encontrado' });
+            }
+            servicios = await ServicioRestaurante.findByOfferenteId(oferente.id_oferente);
+        } else {
+            servicios = await ServicioRestaurante.findAll();
+        }
+
         const stats = await ServicioRestaurante.getStats();
 
         res.json({
