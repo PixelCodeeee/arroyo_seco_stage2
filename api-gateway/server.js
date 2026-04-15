@@ -2,21 +2,70 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const proxy = require('express-http-proxy');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const promClient = require('prom-client');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-app.use(cors());
+app.set('trust proxy', 1);
 
-// Logging middleware
-app.use((req, res, next) => {
-    console.log(`[Gateway] ${req.method} ${req.path}`);
-    next();
-});
+const allowedOriginsEnv = process.env.NODE_ENV === 'production'
+    ? ['https://arroyoseco.online']
+    : ['https://arroyoseco.online', 'http://localhost:5173'];
+
+const corsOptions = {
+    origin: process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : allowedOriginsEnv,
+    optionsSuccessStatus: 200
+};
+app.use(cors(corsOptions));
+
+app.use(helmet({ crossOriginResourcePolicy: false }));
 
 // Health check
 app.get('/health', (req, res) => {
     res.json({ status: 'OK', service: 'API Gateway' });
+});
+
+// Catch-all for stubborn GCP Health Checks
+app.get('/api/', (req, res) => {
+    res.status(200).send('GCP Health Check OK');
+});
+
+// Default route
+app.get('/', (req, res) => {
+    res.send('Arroyo Seco API Gateway Running');
+});
+
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 1000,
+    message: { error: 'Too many requests, please try again later.' },
+    skip: (req) => process.env.NODE_ENV === 'test'
+});
+app.use(limiter);
+
+// --- PROMETHEUS SETUP ---
+const collectDefaultMetrics = promClient.collectDefaultMetrics;
+collectDefaultMetrics({ prefix: 'arroyo_gateway_' });
+
+app.get('/metrics', async (req, res) => {
+    try {
+        res.set('Content-Type', promClient.register.contentType);
+        res.end(await promClient.register.metrics());
+    } catch (ex) {
+        res.status(500).end(ex);
+    }
+});
+// ------------------------
+
+// Logging middleware
+app.use((req, res, next) => {
+    if (req.path !== '/metrics') {
+        console.log(`[Gateway] ${req.method} ${req.path}`);
+    }
+    next();
 });
 
 // Service URLs
@@ -25,99 +74,52 @@ const CATALOG_SERVICE = process.env.CATALOG_SERVICE_URL || 'http://localhost:500
 const ORDER_SERVICE = process.env.ORDER_SERVICE_URL || 'http://localhost:5003';
 const RESERVATION_SERVICE = process.env.RESERVATION_SERVICE_URL || 'http://localhost:5004';
 const PAYMENT_SERVICE = process.env.PAYMENT_SERVICE_URL || 'http://localhost:5005';
-const ANNOUNCEMENTS_SERVICE = process.env.ANNOUNCEMENTS_SERVICE_URL || 'http://localhost:5006';
+const ANNOUNCEMENTS_SERVICE = process.env.ANNOUNCEMENTS_SERVICE_URL || 'http://localhost:5007'; // ✅ FIX
 
 // Proxy rules
-app.use('/api/usuarios', proxy(AUTH_SERVICE, {
-    proxyReqPathResolver: (req) => `/api/usuarios${req.url}`,
+const commonProxyOptions = {
+    proxyReqPathResolver: (req) => req.originalUrl,
     proxyReqOptDecorator: (proxyReqOpts) => {
         proxyReqOpts.headers['Content-Type'] = 'application/json';
         return proxyReqOpts;
     }
-}));
+};
 
-app.use('/api/categorias', proxy(CATALOG_SERVICE, {
-    proxyReqPathResolver: (req) => `/api/categorias${req.url}`,
-    proxyReqOptDecorator: (proxyReqOpts) => {
-        proxyReqOpts.headers['Content-Type'] = 'application/json';
-        return proxyReqOpts;
-    }
-}));
+app.use('/api/usuarios', proxy(AUTH_SERVICE, commonProxyOptions));
+app.use('/api/categorias', proxy(CATALOG_SERVICE, commonProxyOptions));
+app.use('/api/productos', proxy(CATALOG_SERVICE, commonProxyOptions));
+app.use('/api/oferentes', proxy(CATALOG_SERVICE, commonProxyOptions));
+app.use('/api/servicios', proxy(CATALOG_SERVICE, commonProxyOptions));
+app.use('/api/pedidos', proxy(ORDER_SERVICE, commonProxyOptions));
+app.use('/api/carrito', proxy(ORDER_SERVICE, commonProxyOptions));
+app.use('/api/reservas', proxy(RESERVATION_SERVICE, commonProxyOptions));
 
-app.use('/api/productos', proxy(CATALOG_SERVICE, {
-    proxyReqPathResolver: (req) => `/api/productos${req.url}`,
-    proxyReqOptDecorator: (proxyReqOpts) => {
-        proxyReqOpts.headers['Content-Type'] = 'application/json';
-        return proxyReqOpts;
-    }
-}));
+app.use('/api/mercadopago', proxy(PAYMENT_SERVICE, {
+    ...commonProxyOptions,
+    userResHeaderDecorator(headers, userReq) {
+        const checkOrigins = process.env.NODE_ENV === 'production'
+            ? ['https://arroyoseco.online']
+            : ['https://arroyoseco.online', 'http://localhost:5173'];
 
-app.use('/api/oferentes', proxy(CATALOG_SERVICE, {
-    proxyReqPathResolver: (req) => `/api/oferentes${req.url}`,
-    proxyReqOptDecorator: (proxyReqOpts) => {
-        proxyReqOpts.headers['Content-Type'] = 'application/json';
-        return proxyReqOpts;
-    }
-}));
+        const allowedOrigins = process.env.FRONTEND_URL
+            ? [process.env.FRONTEND_URL]
+            : checkOrigins;
 
-app.use('/api/servicios', proxy(CATALOG_SERVICE, {
-    proxyReqPathResolver: (req) => `/api/servicios${req.url}`,
-    proxyReqOptDecorator: (proxyReqOpts) => {
-        proxyReqOpts.headers['Content-Type'] = 'application/json';
-        return proxyReqOpts;
-    }
-}));
+        const reqOrigin = userReq.headers.origin;
 
-app.use('/api/pedidos', proxy(ORDER_SERVICE, {
-    proxyReqPathResolver: (req) => `/api/pedidos${req.url}`,
-    proxyReqOptDecorator: (proxyReqOpts) => {
-        proxyReqOpts.headers['Content-Type'] = 'application/json';
-        return proxyReqOpts;
-    }
-}));
+        headers['access-control-allow-origin'] = allowedOrigins.includes(reqOrigin)
+            ? reqOrigin
+            : (process.env.FRONTEND_URL || 'https://arroyoseco.online');
 
-app.use('/api/carrito', proxy(ORDER_SERVICE, {
-    proxyReqPathResolver: (req) => `/api/carrito${req.url}`,
-    proxyReqOptDecorator: (proxyReqOpts) => {
-        proxyReqOpts.headers['Content-Type'] = 'application/json';
-        return proxyReqOpts;
-    }
-}));
-
-app.use('/api/reservas', proxy(RESERVATION_SERVICE, {
-    proxyReqPathResolver: (req) => `/api/reservas${req.url}`,
-    proxyReqOptDecorator: (proxyReqOpts) => {
-        proxyReqOpts.headers['Content-Type'] = 'application/json';
-        return proxyReqOpts;
-    }
-}));
-
-app.use('/api/paypal', proxy(PAYMENT_SERVICE, {
-    proxyReqPathResolver: (req) => `/api/paypal${req.url}`,
-    proxyReqOptDecorator: (proxyReqOpts) => {
-        proxyReqOpts.headers['Content-Type'] = 'application/json';
-        return proxyReqOpts;
-    },
-    userResHeaderDecorator(headers) {
-        headers['access-control-allow-origin'] = '*';
         headers['access-control-allow-methods'] = 'GET, POST, PUT, DELETE, OPTIONS';
         headers['access-control-allow-headers'] = 'Content-Type, Authorization';
+
         return headers;
     }
 }));
 
-app.use('/api/announcements', proxy(ANNOUNCEMENTS_SERVICE, {
-    proxyReqPathResolver: (req) => `/announcements${req.url}`,
-    proxyReqOptDecorator: (proxyReqOpts) => {
-        proxyReqOpts.headers['Content-Type'] = 'application/json';
-        return proxyReqOpts;
-    }
-}));
-
-// Default route
-app.get('/', (req, res) => {
-    res.send('Arroyo Seco API Gateway Running');
-});
+// ✅ FIX REAL AQUÍ
+app.use('/api/announcements', proxy(ANNOUNCEMENTS_SERVICE, commonProxyOptions));
 
 if (require.main === module) {
     app.listen(PORT, () => {

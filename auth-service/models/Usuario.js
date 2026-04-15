@@ -1,4 +1,4 @@
-const db = require('../config/db');
+const db = require('../config/db'); // This is now PrismaClient
 const bcrypt = require('bcrypt');
 
 class Usuario {
@@ -10,93 +10,96 @@ class Usuario {
         const saltRounds = 10;
         const contrasena_hash = await bcrypt.hash(contrasena, saltRounds);
 
-        const [result] = await db.query(
-            'INSERT INTO usuario (correo, contrasena_hash, nombre, rol) VALUES (?, ?, ?, ?)',
-            [correo, contrasena_hash, nombre, rol]
-        );
+        const usuario = await db.usuario.create({
+            data: {
+                correo,
+                contrasena_hash,
+                nombre,
+                rol: rol || 'turista',
+                esta_activo: false
+            }
+        });
 
         return {
-            id_usuario: result.insertId,
-            correo,
-            nombre,
-            rol,
-            esta_activo: true
+            id_usuario: usuario.id_usuario,
+            correo: usuario.correo,
+            nombre: usuario.nombre,
+            rol: usuario.rol,
+            esta_activo: usuario.esta_activo
         };
     }
 
     // Find all users
     static async findAll() {
-        const [usuarios] = await db.query(
-            'SELECT id_usuario, correo, nombre, rol, fecha_creacion, esta_activo FROM usuario'
-        );
-        return usuarios;
+        return await db.usuario.findMany({
+            select: {
+                id_usuario: true,
+                correo: true,
+                nombre: true,
+                rol: true,
+                fecha_creacion: true,
+                esta_activo: true
+            }
+        });
     }
 
     // Find user by ID
     static async findById(id) {
-        const [usuarios] = await db.query(
-            'SELECT id_usuario, correo, nombre, rol, fecha_creacion, esta_activo FROM usuario WHERE id_usuario = ?',
-            [id]
-        );
-        return usuarios[0] || null;
+        return await db.usuario.findUnique({
+            where: { id_usuario: parseInt(id, 10) },
+            select: {
+                id_usuario: true,
+                correo: true,
+                nombre: true,
+                rol: true,
+                fecha_creacion: true,
+                esta_activo: true
+            }
+        });
     }
 
     // Find user by email
     static async findByEmail(correo) {
-        const [usuarios] = await db.query(
-            'SELECT * FROM usuario WHERE correo = ?',
-            [correo]
-        );
-        return usuarios[0] || null;
+        return await db.usuario.findUnique({
+            where: { correo }
+        });
     }
 
     // Update user
     static async update(id, userData) {
         const { correo, contrasena, nombre, rol, esta_activo } = userData;
 
-        let updateFields = [];
-        let values = [];
-
-        if (correo) {
-            updateFields.push('correo = ?');
-            values.push(correo);
-        }
+        const data = {};
+        if (correo) data.correo = correo;
         if (contrasena) {
-            const contrasena_hash = await bcrypt.hash(contrasena, 10);
-            updateFields.push('contrasena_hash = ?');
-            values.push(contrasena_hash);
+            data.contrasena_hash = await bcrypt.hash(contrasena, 10);
         }
-        if (nombre) {
-            updateFields.push('nombre = ?');
-            values.push(nombre);
-        }
-        if (rol) {
-            updateFields.push('rol = ?');
-            values.push(rol);
-        }
-        if (typeof esta_activo === 'boolean') {
-            updateFields.push('esta_activo = ?');
-            values.push(esta_activo);
-        }
+        if (nombre) data.nombre = nombre;
+        if (rol) data.rol = rol;
+        if (typeof esta_activo === 'boolean') data.esta_activo = esta_activo;
 
-        if (updateFields.length === 0) {
+        if (Object.keys(data).length === 0) {
             return null;
         }
 
-        values.push(id);
-        const query = `UPDATE usuario SET ${updateFields.join(', ')} WHERE id_usuario = ?`;
+        await db.usuario.update({
+            where: { id_usuario: parseInt(id, 10) },
+            data
+        });
 
-        await db.query(query, values);
         return await this.findById(id);
     }
 
     // Delete user
     static async delete(id) {
-        const [result] = await db.query(
-            'DELETE FROM usuario WHERE id_usuario = ?',
-            [id]
-        );
-        return result.affectedRows > 0;
+        try {
+            await db.usuario.delete({
+                where: { id_usuario: parseInt(id, 10) }
+            });
+            return true;
+        } catch(e) {
+            return false;
+        }
     }
 
     // Verify password
@@ -106,48 +109,58 @@ class Usuario {
 
     // Check if email exists
     static async emailExists(correo, excludeId = null) {
-        let query = 'SELECT id_usuario FROM usuario WHERE correo = ?';
-        let params = [correo];
-
+        const where = { correo };
         if (excludeId) {
-            query += ' AND id_usuario != ?';
-            params.push(excludeId);
+            where.id_usuario = { not: parseInt(excludeId, 10) };
         }
-
-        const [usuarios] = await db.query(query, params);
-        return usuarios.length > 0;
+        const user = await db.usuario.findFirst({ where });
+        return !!user;
     }
 
     // Stats para analíticas
-static async getStats() {
-    const [rows] = await db.query(`
-        SELECT
-            COUNT(*) as total_usuarios,
-            SUM(CASE WHEN rol = 'turista' THEN 1 ELSE 0 END) as turistas,
-            SUM(CASE WHEN rol = 'oferente' THEN 1 ELSE 0 END) as oferentes,
-            SUM(CASE WHEN rol = 'admin' THEN 1 ELSE 0 END) as admins,
-            SUM(CASE WHEN esta_activo = 1 THEN 1 ELSE 0 END) as activos
-        FROM usuario
-    `);
-    return rows[0];
-}
+    static async getStats() {
+        const total_usuarios = await db.usuario.count();
+        const turistas = await db.usuario.count({ where: { rol: 'turista' } });
+        const oferentes = await db.usuario.count({ where: { rol: 'oferente' } });
+        const admins = await db.usuario.count({ where: { rol: 'admin' } });
+        const moderadores = await db.usuario.count({ where: { rol: 'moderador' } });
+        const activos = await db.usuario.count({ where: { esta_activo: true } });
+        
+        return { total_usuarios, turistas, oferentes, admins, moderadores, activos };
+    }
 
-// Usuarios registrados por mes (últimos 6 meses)
-static async getRegistrosPorMes() {
-    const [rows] = await db.query(`
-        SELECT
-            DATE_FORMAT(fecha_creacion, '%Y-%m') as mes,
-            DATE_FORMAT(fecha_creacion, '%b %Y') as mes_label,
-            COUNT(*) as total
-        FROM usuario
-        WHERE fecha_creacion >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
-        GROUP BY DATE_FORMAT(fecha_creacion, '%Y-%m'), DATE_FORMAT(fecha_creacion, '%b %Y')
-        ORDER BY mes ASC
-    `);
-    return rows;
-}
-}
+    // Usuarios registrados por mes (últimos 6 meses)
+    static async getRegistrosPorMes() {
+        const sixMonthsAgo = new Date();
+        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+        
+        const usuarios = await db.usuario.findMany({
+            where: { fecha_creacion: { gte: sixMonthsAgo } },
+            select: { fecha_creacion: true },
+            orderBy: { fecha_creacion: 'asc' }
+        });
 
+        const countsMap = new Map();
+        
+        for (const u of usuarios) {
+            if (!u.fecha_creacion) continue;
+            
+            const reqDate = new Date(u.fecha_creacion);
+            const year = reqDate.getFullYear();
+            const monthStr = String(reqDate.getMonth() + 1).padStart(2, '0');
+            const key = `${year}-${monthStr}`;
+            
+            if (!countsMap.has(key)) {
+                let monthLabel = new Intl.DateTimeFormat('en-US', { month: 'short' }).format(reqDate);
+                const label = `${monthLabel} ${year}`;
+                countsMap.set(key, { mes: key, mes_label: label, total: 0 });
+            }
+            
+            countsMap.get(key).total++;
+        }
 
+        return Array.from(countsMap.values());
+    }
+}
 
 module.exports = Usuario;

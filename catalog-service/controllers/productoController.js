@@ -1,10 +1,14 @@
 const Producto = require('../models/Producto');
 const Categoria = require('../models/Categoria');
 const Oferente = require('../models/Oferente');
+const { productoDTO, productosDTO } = require('../utils/dto');
 
-exports.obtenerProductosPorOferente = async (req, res) => {
+// En el caso de los catalogos, la base de datos se debe exponer, pero restringir las modificaciones.
+
+exports.obtenerProductosPorOferente = async (req, res, next) => {
     try {
-        const { oferenteId } = req.params;
+        const oferenteId = parseInt(req.params.oferenteId, 10);
+        if (isNaN(oferenteId)) return res.status(400).json({ error: "ID inválido" });
 
         // Validar que el oferente existe
         const oferente = await Oferente.findById(oferenteId);
@@ -17,22 +21,33 @@ exports.obtenerProductosPorOferente = async (req, res) => {
 
         res.json({
             success: true,
-            productos: productos.filter(p => p.estatus === 1) // Solo productos activos
+            productos: productosDTO(productos)
         });
 
     } catch (err) {
-        console.error('Error obteniendo productos por oferente:', err);
-        res.status(500).json({ error: err.message });
+        next(err);
     }
 };
 
-exports.crearProducto = async (req, res) => {
+exports.crearProducto = async (req, res, next) => {
     try {
-        const { id_oferente, nombre, descripcion, precio, inventario, imagenes, estatus = 1, id_categoria } = req.body;
+        let { id_oferente, nombre, descripcion, precio, inventario, imagenes, estatus = true, id_categoria } = req.body;
+        id_oferente = parseInt(id_oferente, 10);
+        id_categoria = parseInt(id_categoria, 10);
 
         // Validación básica
-        if (!id_oferente || !nombre || !precio || !id_categoria) {
-            return res.status(400).json({ error: 'Faltan campos requeridos' });
+        if (!id_oferente || isNaN(id_oferente) || !nombre || !precio || !id_categoria || isNaN(id_categoria)) {
+            return res.status(400).json({ error: 'Faltan campos requeridos y numéricos' });
+        }
+
+        // Authorization check. IDOR prevention.
+        if (req.user && req.user.rol === 'oferente') {
+            const oferenteUser = await Oferente.findByUserId(req.user.id);
+            if (!oferenteUser || oferenteUser.id_oferente !== id_oferente) {
+                return res.status(403).json({ error: "No autorizado para crear productos de otro oferente" });
+            }
+        } else if (req.user && req.user.rol !== 'admin' && req.user.rol !== 'moderador') {
+            return res.status(403).json({ error: "No autorizado" });
         }
 
         // Validar oferente existe
@@ -65,47 +80,76 @@ exports.crearProducto = async (req, res) => {
             id_categoria
         });
 
-        res.status(201).json({ message: 'Producto creado', producto: nuevo });
+        res.status(201).json({ message: 'Producto creado', producto: productoDTO(nuevo) });
 
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: err.message || 'Error al crear producto' });
+        next(err);
     }
 };
 
-exports.obtenerProductos = async (req, res) => {
+exports.obtenerProductos = async (req, res, next) => {
     try {
-        const productos = await Producto.findAll();
+        let productos;
+
+        // If authenticated oferente, only return their own products
+        if (req.user && req.user.rol === 'oferente') {
+            const oferente = await Oferente.findByUserId(req.user.id);
+            if (!oferente) {
+                return res.status(403).json({ error: 'Perfil de oferente no encontrado' });
+            }
+            productos = await Producto.findByOferente(oferente.id_oferente);
+        } else {
+            productos = await Producto.findAll();
+        }
+
         const categorias = await Categoria.findAll();
-        res.json({ productos, categorias });
+        res.json({ productos: productosDTO(productos), categorias });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        next(err);
     }
 };
 
-exports.obtenerMisProductos = async (req, res) => {
+exports.obtenerMisProductos = async (req, res, next) => {
     try {
         const id_oferente = req.user.oferenteId; // auth middleware
         const productos = await Producto.findByOferente(id_oferente);
-        res.json({ productos });
+        res.json({ productos: productosDTO(productos) });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        next(err);
     }
 };
 
-exports.obtenerProducto = async (req, res) => {
+exports.obtenerProducto = async (req, res, next) => {
     try {
-        const producto = await Producto.findById(req.params.id);
+        const id = parseInt(req.params.id, 10);
+        if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
+
+        const producto = await Producto.findById(id);
         if (!producto) return res.status(404).json({ error: 'Producto no encontrado' });
-        res.json(producto);
+        res.json(productoDTO(producto));
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        next(err);
     }
 };
 
-exports.actualizarProducto = async (req, res) => {
+exports.actualizarProducto = async (req, res, next) => {
     try {
         let data = { ...req.body };
+        const id = parseInt(req.params.id, 10);
+        if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
+
+        const productoOriginal = await Producto.findById(id);
+        if (!productoOriginal) return res.status(404).json({ error: "Producto no encontrado" });
+
+        // Authorization check. IDOR prevention.
+        if (req.user && req.user.rol === 'oferente') {
+            const oferenteUser = await Oferente.findByUserId(req.user.id);
+            if (!oferenteUser || oferenteUser.id_oferente !== productoOriginal.id_oferente) {
+                return res.status(403).json({ error: "No autorizado para modificar este producto" });
+            }
+        } else if (req.user && req.user.rol !== 'admin' && req.user.rol !== 'moderador') {
+            return res.status(403).json({ error: "No autorizado" });
+        }
 
         // normalizar imágenes si las mandan como string
         if (data.imagenes !== undefined) {
@@ -117,23 +161,42 @@ exports.actualizarProducto = async (req, res) => {
             if (!Array.isArray(data.imagenes)) data.imagenes = [];
         }
 
-        const updated = await Producto.update(req.params.id, data);
+        // Block changing ownership implicitly via PUT body
+        delete data.id_oferente;
+
+        const updated = await Producto.update(id, data);
         if (!updated) return res.status(404).json({ error: 'Producto no encontrado' });
 
-        res.json({ message: 'Actualizado', producto: updated });
+        res.json({ message: 'Actualizado', producto: productoDTO(updated) });
 
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        next(err);
     }
 };
 
-exports.eliminarProducto = async (req, res) => {
+exports.eliminarProducto = async (req, res, next) => {
     try {
-        const deleted = await Producto.delete(req.params.id);
+        const id = parseInt(req.params.id, 10);
+        if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
+
+        const productoOriginal = await Producto.findById(id);
+        if (!productoOriginal) return res.status(404).json({ error: "Producto no encontrado" });
+
+        // Authorization check
+        if (req.user && req.user.rol === 'oferente') {
+            const oferenteUser = await Oferente.findByUserId(req.user.id);
+            if (!oferenteUser || oferenteUser.id_oferente !== productoOriginal.id_oferente) {
+                return res.status(403).json({ error: "No autorizado para eliminar este producto" });
+            }
+        } else if (req.user && req.user.rol !== 'admin') {
+            return res.status(403).json({ error: "No autorizado" });
+        }
+
+        const deleted = await Producto.delete(id);
         if (!deleted) return res.status(404).json({ error: 'No encontrado' });
 
         res.json({ message: 'Producto eliminado' });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        next(err);
     }
 };

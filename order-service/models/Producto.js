@@ -1,9 +1,10 @@
-const db = require('../config/db');
+const { prisma } = require('../config/db');
 
 class Producto {
     static async findById(id) {
-        const [rows] = await db.query('SELECT * FROM producto WHERE id_producto = ?', [id]);
-        return rows[0] || null;
+        return await prisma.producto.findUnique({
+            where: { id_producto: parseInt(id, 10) }
+        });
     }
 
     static async checkStock(id, cantidad) {

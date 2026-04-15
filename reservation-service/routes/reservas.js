@@ -3,21 +3,27 @@ const router = express.Router();
 const reservaController = require('../controllers/reservaController');
 const { verifyToken, verifyAdmin, verifyoferente } = require('../middleware/auth');
 
-// Public availability check
-router.get('/disponibilidad', reservaController.verificarDisponibilidad);
+const injectOferenteIfNeeded = async (req, res, next) => {
+    if (req.user?.rol === 'oferente') return verifyoferente(req, res, next);
+    next();
+};
 
-// Protected routes
-router.post('/', verifyToken, reservaController.crearReserva);
-router.get('/', verifyToken, verifyAdmin, reservaController.obtenerReservas);
+// Public
+router.get('/disponibilidad', reservaController.verificarDisponibilidad);
 router.get('/recomendaciones/top-servicios', reservaController.getTopServicios);
-// Analíticas (solo admin)
+
+// Static named routes BEFORE /:id
 router.get('/analiticas/stats', verifyToken, reservaController.getStatsAnaliticas);
-router.get('/:id', verifyToken, reservaController.obtenerReservaPorId); // Check ownership in controller ideally
 router.get('/usuario/:usuarioId', verifyToken, reservaController.obtenerReservasPorUsuario);
 router.get('/oferente/:oferenteId', verifyToken, verifyoferente, reservaController.obtenerReservasPorOferente);
-router.put('/:id', verifyToken, reservaController.actualizarReserva); // User or Admin?
-router.patch('/:id/estado', verifyToken, verifyAdmin, reservaController.cambiarEstado); // Admin or Oferente? Usually Oferente accepts/rejects.
-router.delete('/:id', verifyToken, reservaController.eliminarReserva);
 
+// Wildcard /:id last
+router.get('/:id', verifyToken, injectOferenteIfNeeded, reservaController.obtenerReservaPorId);
+
+router.post('/', verifyToken, reservaController.crearReserva);
+router.get('/', verifyToken, injectOferenteIfNeeded, reservaController.obtenerReservas);
+router.put('/:id', verifyToken, injectOferenteIfNeeded, reservaController.actualizarReserva);
+router.patch('/:id/estado', verifyToken, injectOferenteIfNeeded, reservaController.cambiarEstado);
+router.delete('/:id', verifyToken, reservaController.eliminarReserva);
 
 module.exports = router;

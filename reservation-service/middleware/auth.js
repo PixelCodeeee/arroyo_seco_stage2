@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const db = require('../config/db');
+const { prisma } = require('../config/db');
 
 // Verify if user is authenticated
 const verifyToken = (req, res, next) => {
@@ -13,7 +13,10 @@ const verifyToken = (req, res, next) => {
             });
         }
 
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || '123');
+        if (!process.env.JWT_SECRET) {
+            throw new Error('JWT_SECRET is not defined');
+        }
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
         req.user = decoded;
         next();
     } catch (error) {
@@ -36,7 +39,10 @@ const verifyoferente = async (req, res, next) => {
             });
         }
 
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || '123');
+        if (!process.env.JWT_SECRET) {
+            throw new Error('JWT_SECRET is not defined');
+        }
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
         // Check if user has oferente role or is admin
         if (decoded.rol !== 'oferente' && decoded.rol !== 'admin') {
@@ -47,10 +53,9 @@ const verifyoferente = async (req, res, next) => {
         }
 
         // Get oferente info from database
-        const [oferentes] = await db.query(
-            'SELECT * FROM oferente WHERE id_usuario = ?',
-            [decoded.id]
-        );
+        const oferentes = await prisma.oferente.findMany({
+            where: { id_usuario: decoded.id }
+        });
 
         if (oferentes.length === 0) {
             return res.status(404).json({
@@ -85,7 +90,10 @@ const verifyAdmin = (req, res, next) => {
             });
         }
 
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || '123');
+        if (!process.env.JWT_SECRET) {
+            throw new Error('JWT_SECRET is not defined');
+        }
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
         if (decoded.rol !== 'admin') {
             return res.status(403).json({

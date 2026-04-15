@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const db = require('../config/db');
+const { prisma } = require('../config/db');
 
 // Verify if user is authenticated
 const verifyToken = (req, res, next) => {
@@ -13,9 +13,11 @@ const verifyToken = (req, res, next) => {
             });
         }
 
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || '123');
+        if (!process.env.JWT_SECRET) {
+            throw new Error('JWT_SECRET is not defined');
+        }
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
         req.user = decoded;
-        console.log('[AuthMiddleware] req.body:', req.body);
         next();
     } catch (error) {
         return res.status(401).json({
@@ -37,33 +39,43 @@ const verifyoferente = async (req, res, next) => {
             });
         }
 
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || '123');
+        if (!process.env.JWT_SECRET) {
+            throw new Error('JWT_SECRET is not defined');
+        }
 
-        // Check if user has oferente role or is admin
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        req.user = decoded;
+
+        // ✅ Only allow oferente or admin
         if (decoded.rol !== 'oferente' && decoded.rol !== 'admin') {
             return res.status(403).json({
                 success: false,
-                message: 'No tienes permiso para realizar esta acción. Debes ser oferente.'
+                message: 'No tienes permiso para realizar esta acción.'
             });
         }
 
-        // Get oferente info from database
-        const [oferentes] = await db.query(
-            'SELECT * FROM oferente WHERE id_usuario = ?',
-            [decoded.id]
-        );
+        // ✅ Admin bypass (CRITICAL FIX)
+        if (decoded.rol === 'admin') {
+            return next();
+        }
 
-        if (oferentes.length === 0) {
-            return res.status(404).json({
+        // ✅ Only oferentes reach this point
+        const oferente = await prisma.oferente.findFirst({
+            where: { id_usuario: decoded.id }
+        });
+
+        if (!oferente) {
+            return res.status(403).json({
                 success: false,
-                message: 'Oferente no encontrado. Por favor completa tu perfil de oferente.'
+                message: 'Debes completar tu perfil de oferente'
             });
         }
 
-        req.user = decoded;
-        req.user.oferenteId = oferentes[0].id_oferente; // Attach oferenteId to request
-        req.oferente = oferentes[0];
+        req.user.oferenteId = oferente.id_oferente;
+        req.oferente = oferente;
+
         next();
+
     } catch (error) {
         console.error('Error in verifyoferente middleware:', error);
         return res.status(401).json({
@@ -86,7 +98,10 @@ const verifyAdmin = (req, res, next) => {
             });
         }
 
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || '123');
+        if (!process.env.JWT_SECRET) {
+            throw new Error('JWT_SECRET is not defined');
+        }
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
         if (decoded.rol !== 'admin') {
             return res.status(403).json({
@@ -105,8 +120,59 @@ const verifyAdmin = (req, res, next) => {
     }
 };
 
+// Verify if user is admin or moderador
+const verifyAdminOrModerador = (req, res, next) => {
+    try {
+        const token = req.headers.authorization?.split(' ')[1];
+
+        if (!token) {
+            return res.status(401).json({
+                success: false,
+                message: 'Token no proporcionado'
+            });
+        }
+
+        if (!process.env.JWT_SECRET) {
+            throw new Error('JWT_SECRET is not defined');
+        }
+
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+        if (decoded.rol !== 'admin' && decoded.rol !== 'moderador') {
+            return res.status(403).json({
+                success: false,
+                message: 'Requiere privilegios de administrador o moderador'
+            });
+        }
+
+        req.user = decoded;
+        next();
+    } catch (error) {
+        return res.status(401).json({
+            success: false,
+            message: 'Token inválido o expirado'
+        });
+    }
+};
+
+// Optional auth — sets req.user if a valid token is present, but does NOT reject if missing/invalid
+const optionalAuth = (req, res, next) => {
+    try {
+        const token = req.headers.authorization?.split(' ')[1];
+        if (token && process.env.JWT_SECRET) {
+            const decoded = jwt.verify(token, process.env.JWT_SECRET);
+            req.user = decoded;
+        }
+    } catch {
+        // Token invalid/expired — continue as unauthenticated
+    }
+    next();
+};
+
 module.exports = {
     verifyToken,
     verifyoferente,
-    verifyAdmin
+    verifyAdmin,
+    verifyAdminOrModerador,
+    optionalAuth
 };

@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS usuario (
     correo VARCHAR(255) UNIQUE NOT NULL,
     contrasena_hash VARCHAR(255) NOT NULL,
     nombre VARCHAR(100) NOT NULL,
-    rol ENUM('turista', 'oferente', 'admin') NOT NULL DEFAULT 'turista',
+    rol ENUM('turista', 'oferente', 'admin', 'moderador') NOT NULL DEFAULT 'turista',
     fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     esta_activo BOOLEAN DEFAULT TRUE
 );
@@ -44,6 +44,10 @@ CREATE TABLE IF NOT EXISTS oferente (
     horario_disponibilidad JSON,
     imagen VARCHAR(255),
     telefono VARCHAR(20),
+    mp_user_id VARCHAR(255),
+    mp_access_token VARCHAR(255),
+    mp_refresh_token VARCHAR(255),
+    mp_estado BOOLEAN DEFAULT FALSE,
     FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario) ON DELETE CASCADE
 );
 
@@ -83,6 +87,7 @@ CREATE TABLE IF NOT EXISTS pedido (
     fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     estado ENUM('pendiente', 'pagado', 'enviado', 'completado') DEFAULT 'pendiente',
     metodo_pago VARCHAR(50),
+    payment_id VARCHAR(255),
     FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario) ON DELETE CASCADE
 );
 
@@ -122,6 +127,7 @@ CREATE TABLE IF NOT EXISTS reserva (
     FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario) ON DELETE CASCADE,
     FOREIGN KEY (id_servicio) REFERENCES servicio_restaurante(id_servicio) ON DELETE CASCADE
 );
+
 -- 11. Announcements (No dependencies)
 CREATE TABLE IF NOT EXISTS announcements (
     id INT AUTO_INCREMENT PRIMARY KEY,

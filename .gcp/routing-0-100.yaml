@@ -1,0 +1,19 @@
+defaultService: global/backendServices/bs-stable-v1
+name: arroyo-seco-canary-lb
+hostRules:
+  - hosts:
+      - '*'
+    pathMatcher: path-matcher-1
+pathMatchers:
+  - defaultService: global/backendServices/bs-stable-v1
+    name: path-matcher-1
+    routeRules:
+      - matchRules:
+          - prefixMatch: /
+        priority: 1
+        routeAction:
+          weightedBackendServices:
+            - backendService: global/backendServices/bs-stable-v1
+              weight: 0
+            - backendService: global/backendServices/bs-canary-v2
+              weight: 100

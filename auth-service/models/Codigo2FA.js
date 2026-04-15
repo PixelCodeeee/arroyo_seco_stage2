@@ -12,47 +12,57 @@ class Codigo2FA {
         const fecha_expiracion = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
         // Delete any existing unused codes for this user
-        await db.query(
-            'DELETE FROM codigo_2fa WHERE id_usuario = ? AND usado = FALSE',
-            [userId]
-        );
+        await db.codigo_2fa.deleteMany({
+            where: {
+                id_usuario: parseInt(userId, 10),
+                usado: false
+            }
+        });
 
         // Insert new code
-        await db.query(
-            'INSERT INTO codigo_2fa (id_usuario, codigo, fecha_expiracion) VALUES (?, ?, ?)',
-            [userId, codigo, fecha_expiracion]
-        );
+        await db.codigo_2fa.create({
+            data: {
+                id_usuario: parseInt(userId, 10),
+                codigo: codigo,
+                fecha_expiracion: fecha_expiracion,
+                usado: false
+            }
+        });
 
         return codigo;
     }
 
     // Verify code
     static async verify(userId, codigo) {
-        const [results] = await db.query(
-            `SELECT * FROM codigo_2fa 
-             WHERE id_usuario = ? 
-             AND codigo = ? 
-             AND usado = FALSE 
-             AND fecha_expiracion > NOW()`,
-            [userId, codigo]
-        );
+        const result = await db.codigo_2fa.findFirst({
+            where: {
+                id_usuario: parseInt(userId, 10),
+                codigo: codigo,
+                usado: false,
+                fecha_expiracion: { gt: new Date() }
+            }
+        });
 
-        if (results.length === 0) {
+        if (!result) {
             return false;
         }
 
         // Mark code as used
-        await db.query(
-            'UPDATE codigo_2fa SET usado = TRUE WHERE id = ?',
-            [results[0].id]
-        );
+        await db.codigo_2fa.update({
+            where: { id: result.id },
+            data: { usado: true }
+        });
 
         return true;
     }
 
     // Clean expired codes (run periodically)
     static async cleanExpired() {
-        await db.query('DELETE FROM codigo_2fa WHERE fecha_expiracion < NOW()');
+        await db.codigo_2fa.deleteMany({
+            where: {
+                fecha_expiracion: { lt: new Date() }
+            }
+        });
     }
 }
 

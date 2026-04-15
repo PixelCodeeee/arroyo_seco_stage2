@@ -1,7 +1,19 @@
-const db = require('../config/db');
+const { prisma } = require('../config/db');
+
+// Builds a full Date object from a date string (YYYY-MM-DD) and a time string (HH:MM).
+// Used everywhere a `hora` column must be stored as a datetime.
+function buildFechaHora(fecha, hora) {
+    const fechaHora = new Date(`${fecha}T${hora}:00`);
+    if (isNaN(fechaHora.getTime())) {
+        throw new Error('Fecha u hora inválida');
+    }
+    return fechaHora;
+}
+
+// Convenience so callers never forget the radix.
+const toInt = (value) => parseInt(value, 10);
 
 class Reserva {
-    // Crear reserva con validaciones de unicidad
     static async create(data) {
         const {
             id_usuario,
@@ -13,308 +25,320 @@ class Reserva {
             notas = null
         } = data;
 
-        // Validar que no exista reserva para el mismo usuario en la misma fecha
-        const [existeUsuarioFecha] = await db.query(
-            `SELECT id_reserva FROM reserva 
-             WHERE id_usuario = ? AND fecha = ?`,
-            [id_usuario, fecha]
-        );
+        const fechaObj = new Date(fecha);
+        const fechaHora = buildFechaHora(fecha, hora); // ✅ use helper consistently
 
-        if (existeUsuarioFecha.length > 0) {
+        const existeUsuarioFecha = await prisma.reserva.findFirst({
+            where: {
+                id_usuario: toInt(id_usuario),
+                fecha: fechaObj
+            }
+        });
+        if (existeUsuarioFecha) {
             throw new Error('Ya existe una reserva para este usuario en esta fecha');
         }
 
-        // Validar que no existan dos reservas para el mismo servicio en la misma fecha y hora
-        const [existeServicioFechaHora] = await db.query(
-            `SELECT id_reserva FROM reserva 
-             WHERE id_servicio = ? AND fecha = ? AND hora = ?`,
-            [id_servicio, fecha, hora]
-        );
-
-        if (existeServicioFechaHora.length > 0) {
+        const existeServicioFechaHora = await prisma.reserva.findFirst({
+            where: {
+                id_servicio: toInt(id_servicio),
+                fecha: fechaObj,
+                hora: fechaHora
+            }
+        });
+        if (existeServicioFechaHora) {
             throw new Error('Ya existe una reserva para este servicio en esta fecha y hora');
         }
 
-        const [result] = await db.query(
-            `INSERT INTO reserva 
-             (id_usuario, id_servicio, fecha, hora, numero_personas, estado, notas)
-             VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            [id_usuario, id_servicio, fecha, hora, numero_personas, estado, notas]
-        );
+        const result = await prisma.reserva.create({
+            data: {
+                id_usuario: toInt(id_usuario),
+                id_servicio: toInt(id_servicio),
+                fecha: fechaObj,
+                hora: fechaHora, // ✅ was: new Date(hora) — invalid for bare "HH:MM" strings
+                numero_personas: toInt(numero_personas),
+                estado,
+                notas
+            }
+        });
 
-        return await this.findById(result.insertId);
+        return this.findById(result.id_reserva);
     }
 
-    // Obtener todas las reservas con información relacionada
     static async findAll() {
-        const [rows] = await db.query(`
-            SELECT 
-                r.*,
-                u.nombre as nombre_usuario,
-                u.correo as email_usuario,
-                s.nombre as nombre_servicio,
-                o.nombre_negocio as nombre_oferente
-            FROM reserva r
-            LEFT JOIN usuario u ON r.id_usuario = u.id_usuario
-            LEFT JOIN servicio_restaurante s ON r.id_servicio = s.id_servicio
-            LEFT JOIN oferente o ON s.id_oferente = o.id_oferente
-            ORDER BY r.fecha DESC, r.hora DESC
-        `);
-        return rows;
+        return prisma.reserva.findMany({
+            include: {
+                usuario: { select: { nombre: true, correo: true } },
+                servicio: {
+                    select: {
+                        nombre: true,
+                        oferente: { select: { nombre_negocio: true } }
+                    }
+                }
+            },
+            orderBy: [{ fecha: 'desc' }, { hora: 'desc' }]
+        });
     }
 
-    // Obtener reserva por ID
     static async findById(id) {
-        const [rows] = await db.query(
-            `SELECT 
-                r.*,
-                u.nombre as nombre_usuario,
-                u.correo as email_usuario,
-                s.nombre as nombre_servicio,
-                o.nombre_negocio as nombre_oferente,
-                o.id_oferente
-            FROM reserva r
-            LEFT JOIN usuario u ON r.id_usuario = u.id_usuario
-            LEFT JOIN servicio_restaurante s ON r.id_servicio = s.id_servicio
-            LEFT JOIN oferente o ON s.id_oferente = o.id_oferente
-            WHERE r.id_reserva = ?`,
-            [id]
-        );
-        return rows.length ? rows[0] : null;
+        return prisma.reserva.findUnique({
+            where: { id_reserva: toInt(id) },
+            include: {
+                usuario: { select: { nombre: true, correo: true } },
+                servicio: { select: { nombre: true } }
+            }
+        });
     }
 
-    // Obtener reservas por usuario
     static async findByUsuarioId(usuarioId) {
-        const [rows] = await db.query(
-            `SELECT 
-                r.*,
-                s.nombre as nombre_servicio,
-                s.rango_precio,
-                o.nombre_negocio as nombre_oferente
-            FROM reserva r
-            LEFT JOIN servicio_restaurante s ON r.id_servicio = s.id_servicio
-            LEFT JOIN oferente o ON s.id_oferente = o.id_oferente
-            WHERE r.id_usuario = ?
-            ORDER BY r.fecha DESC, r.hora DESC`,
-            [usuarioId]
-        );
-        return rows;
+        return prisma.reserva.findMany({
+            where: { id_usuario: toInt(usuarioId) },
+            include: { servicio: { select: { nombre: true, rango_precio: true } } },
+            orderBy: [{ fecha: 'desc' }, { hora: 'desc' }]
+        });
     }
 
-    // Obtener reservas por servicio
     static async findByServicioId(servicioId) {
-        const [rows] = await db.query(
-            `SELECT 
-                r.*,
-                u.nombre as nombre_usuario,
-                u.correo as email_usuario,
-                u.telefono as telefono_usuario
-            FROM reserva r
-            LEFT JOIN usuario u ON r.id_usuario = u.id_usuario
-            WHERE r.id_servicio = ?
-            ORDER BY r.fecha DESC, r.hora DESC`,
-            [servicioId]
-        );
-        return rows;
+        return prisma.reserva.findMany({
+            where: { id_servicio: toInt(servicioId) },
+            include: { usuario: { select: { nombre: true, correo: true } } },
+            orderBy: [{ fecha: 'desc' }, { hora: 'desc' }]
+        });
     }
 
-    // Obtener reservas por oferente (útil para que el oferente vea sus reservas)
+    // ✅ Was throwing unconditionally — Prisma supports nested where through relations.
     static async findByOferenteId(oferenteId) {
-        const [rows] = await db.query(
-            `SELECT 
-                r.*,
-                u.nombre as nombre_usuario,
-                u.correo as email_usuario,
-                u.telefono as telefono_usuario,
-                s.nombre as nombre_servicio
-            FROM reserva r
-            LEFT JOIN usuario u ON r.id_usuario = u.id_usuario
-            LEFT JOIN servicio_restaurante s ON r.id_servicio = s.id_servicio
-            WHERE s.id_oferente = ?
-            ORDER BY r.fecha DESC, r.hora DESC`,
-            [oferenteId]
-        );
-        return rows;
+        return prisma.reserva.findMany({
+            where: {
+                servicio: { id_oferente: toInt(oferenteId) }
+            },
+            include: {
+                usuario: { select: { nombre: true, correo: true } },
+                servicio: { select: { nombre: true } }
+            },
+            orderBy: [{ fecha: 'desc' }, { hora: 'desc' }]
+        });
     }
 
-    // Obtener reservas por estado
     static async findByEstado(estado) {
-        const [rows] = await db.query(
-            `SELECT 
-                r.*,
-                u.nombre as nombre_usuario,
-                s.nombre as nombre_servicio
-            FROM reserva r
-            LEFT JOIN usuario u ON r.id_usuario = u.id_usuario
-            LEFT JOIN servicio_restaurante s ON r.id_servicio = s.id_servicio
-            WHERE r.estado = ?
-            ORDER BY r.fecha DESC, r.hora DESC`,
-            [estado]
-        );
-        return rows;
+        return prisma.reserva.findMany({
+            where: { estado },
+            include: {
+                usuario: { select: { nombre: true } },
+                servicio: { select: { nombre: true } }
+            },
+            orderBy: [{ fecha: 'desc' }, { hora: 'desc' }]
+        });
     }
 
-    // Actualizar reserva con validaciones
     static async update(id, data) {
-        const fields = [];
-        const values = [];
-
-        // Obtener reserva actual
         const reservaActual = await this.findById(id);
         if (!reservaActual) return null;
 
-        // Si se actualiza fecha, validar que el usuario no tenga otra reserva en esa fecha
-        if (data.fecha !== undefined && data.fecha !== reservaActual.fecha) {
-            const [existeUsuarioFecha] = await db.query(
-                `SELECT id_reserva FROM reserva 
-                 WHERE id_usuario = ? AND fecha = ? AND id_reserva != ?`,
-                [reservaActual.id_usuario, data.fecha, id]
-            );
+        const idReserva = toInt(id);
+        const nuevaFecha = data.fecha !== undefined ? new Date(data.fecha) : reservaActual.fecha;
+        const nuevaHora = data.hora !== undefined
+            ? buildFechaHora(data.fecha ?? reservaActual.fecha.toISOString().slice(0, 10), data.hora) // ✅ use helper
+            : reservaActual.hora;
+        const nuevoServicio = data.id_servicio !== undefined ? toInt(data.id_servicio) : reservaActual.id_servicio;
 
-            if (existeUsuarioFecha.length > 0) {
-                throw new Error('Ya existe una reserva para este usuario en esta fecha');
-            }
+        // Check user-date uniqueness only when the date actually changes.
+        if (data.fecha !== undefined && nuevaFecha.getTime() !== new Date(reservaActual.fecha).getTime()) {
+            const existeUsuarioFecha = await prisma.reserva.findFirst({
+                where: {
+                    id_usuario: reservaActual.id_usuario,
+                    fecha: nuevaFecha,
+                    id_reserva: { not: idReserva }
+                }
+            });
+            if (existeUsuarioFecha) throw new Error('Ya existe una reserva para este usuario en esta fecha');
         }
 
-        // Si se actualiza servicio, fecha u hora, validar disponibilidad
-        const nuevaFecha = data.fecha !== undefined ? data.fecha : reservaActual.fecha;
-        const nuevaHora = data.hora !== undefined ? data.hora : reservaActual.hora;
-        const nuevoServicio = data.id_servicio !== undefined ? data.id_servicio : reservaActual.id_servicio;
-
+        // Check service-date-time uniqueness when any of the three fields change.
         if (data.fecha !== undefined || data.hora !== undefined || data.id_servicio !== undefined) {
-            const [existeServicioFechaHora] = await db.query(
-                `SELECT id_reserva FROM reserva 
-                 WHERE id_servicio = ? AND fecha = ? AND hora = ? AND id_reserva != ?`,
-                [nuevoServicio, nuevaFecha, nuevaHora, id]
-            );
-
-            if (existeServicioFechaHora.length > 0) {
-                throw new Error('Ya existe una reserva para este servicio en esta fecha y hora');
-            }
+            const existeServicioFechaHora = await prisma.reserva.findFirst({
+                where: {
+                    id_servicio: nuevoServicio,
+                    fecha: nuevaFecha,
+                    hora: nuevaHora,
+                    id_reserva: { not: idReserva }
+                }
+            });
+            if (existeServicioFechaHora) throw new Error('Ya existe una reserva para este servicio en esta fecha y hora');
         }
 
-        // Construir query de actualización
-        if (data.id_servicio !== undefined) { fields.push('id_servicio = ?'); values.push(data.id_servicio); }
-        if (data.fecha !== undefined) { fields.push('fecha = ?'); values.push(data.fecha); }
-        if (data.hora !== undefined) { fields.push('hora = ?'); values.push(data.hora); }
-        if (data.numero_personas !== undefined) { fields.push('numero_personas = ?'); values.push(data.numero_personas); }
-        if (data.estado !== undefined) { fields.push('estado = ?'); values.push(data.estado); }
-        if (data.notas !== undefined) { fields.push('notas = ?'); values.push(data.notas); }
+        const updateData = {};
+        if (data.id_servicio !== undefined) updateData.id_servicio = nuevoServicio;
+        if (data.fecha !== undefined) updateData.fecha = nuevaFecha;
+        if (data.hora !== undefined) updateData.hora = nuevaHora;
+        if (data.numero_personas !== undefined) updateData.numero_personas = toInt(data.numero_personas);
+        if (data.estado !== undefined) updateData.estado = data.estado;
+        if (data.notas !== undefined) updateData.notas = data.notas;
 
-        if (fields.length === 0) return await this.findById(id);
+        await prisma.reserva.update({
+            where: { id_reserva: idReserva },
+            data: updateData
+        });
 
-        values.push(id);
-        await db.query(
-            `UPDATE reserva SET ${fields.join(', ')} WHERE id_reserva = ?`,
-            values
-        );
-
-        return await this.findById(id);
+        return this.findById(id);
     }
 
-    // Actualizar solo el estado
     static async updateEstado(id, estado) {
-        const [result] = await db.query(
-            `UPDATE reserva SET estado = ? WHERE id_reserva = ?`,
-            [estado, id]
-        );
-
-        if (result.affectedRows === 0) return null;
-        return await this.findById(id);
+        await prisma.reserva.update({
+            where: { id_reserva: toInt(id) },
+            data: { estado }
+        });
+        return this.findById(id);
     }
 
-    // Eliminar reserva
     static async delete(id) {
-        const [result] = await db.query(
-            'DELETE FROM reserva WHERE id_reserva = ?',
-            [id]
-        );
-        return result.affectedRows > 0;
+        const result = await prisma.reserva.delete({
+            where: { id_reserva: toInt(id) }
+        });
+        return !!result;
     }
 
-    // Estadísticas de reservas
     static async getStats() {
-        const [rows] = await db.query(`
-            SELECT 
-                COUNT(*) as total,
-                SUM(CASE WHEN estado = 'pendiente' THEN 1 ELSE 0 END) as pendientes,
-                SUM(CASE WHEN estado = 'confirmada' THEN 1 ELSE 0 END) as confirmadas,
-                SUM(CASE WHEN estado = 'cancelada' THEN 1 ELSE 0 END) as canceladas
-            FROM reserva
-        `);
-        return rows[0];
+        // ✅ Run all counts in parallel instead of sequentially.
+        const [total, pendientes, confirmadas, canceladas] = await Promise.all([
+            prisma.reserva.count(),
+            prisma.reserva.count({ where: { estado: 'pendiente' } }),
+            prisma.reserva.count({ where: { estado: 'confirmada' } }),
+            prisma.reserva.count({ where: { estado: 'cancelada' } })
+        ]);
+
+        return { total, pendientes, confirmadas, canceladas };
     }
 
-    // Verificar disponibilidad (útil antes de crear)
     static async checkDisponibilidad(id_servicio, fecha, hora) {
-        const [rows] = await db.query(
-            `SELECT id_reserva FROM reserva 
-             WHERE id_servicio = ? AND fecha = ? AND hora = ? AND estado != 'cancelada'`,
-            [id_servicio, fecha, hora]
-        );
-        return rows.length === 0;
+        const fechaHora = buildFechaHora(fecha, hora); // ✅ use helper
+
+        const existe = await prisma.reserva.findFirst({
+            where: {
+                id_servicio: toInt(id_servicio),
+                fecha: new Date(fecha),
+                hora: fechaHora,
+                estado: { not: 'cancelada' }
+            }
+        });
+
+        return !existe;
     }
 
-    // Top servicios más reservados (para recomendaciones)
+    // ✅ Use groupBy instead of fetching every row into memory.
     static async getTopServicios(limit = 10) {
-        const [rows] = await db.query(`
-            SELECT
-                s.id_servicio,
-                s.nombre as nombre_servicio,
-                s.descripcion,
-                s.rango_precio,
-                s.capacidad,
-                s.imagenes,
-                o.id_oferente,
-                o.nombre_negocio,
-                o.tipo as tipo_oferente,
-                COUNT(r.id_reserva) as total_reservas,
-                COUNT(DISTINCT r.id_usuario) as total_visitantes
-            FROM reserva r
-            INNER JOIN servicio_restaurante s ON r.id_servicio = s.id_servicio
-            INNER JOIN oferente o ON s.id_oferente = o.id_oferente
-            WHERE r.estado IN ('confirmada', 'pendiente')
-            AND r.fecha_creacion >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-            GROUP BY s.id_servicio
-            ORDER BY total_reservas DESC
-            LIMIT ?
-        `, [limit]);
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-        return rows.map(row => ({
-            ...row,
-            imagenes: (() => {
-                try { return typeof row.imagenes === 'string' ? JSON.parse(row.imagenes) : (row.imagenes || []); }
-                catch { return []; }
-            })()
-        }));
+        const grouped = await prisma.reserva.groupBy({
+            by: ['id_servicio'],
+            where: {
+                estado: { in: ['confirmada', 'pendiente'] },
+                fecha_creacion: { gte: thirtyDaysAgo }
+            },
+            _count: { id_reserva: true },
+            orderBy: { _count: { id_reserva: 'desc' } },
+            take: toInt(limit)
+        });
+
+        if (!grouped.length) return [];
+
+        const servicioIds = grouped.map((g) => g.id_servicio);
+
+        const servicios = await prisma.servicio.findMany({
+            where: { id_servicio: { in: servicioIds } },
+            include: { oferente: true }
+        });
+
+        const servicioMap = new Map(servicios.map((s) => [s.id_servicio, s]));
+
+        // Count distinct visitors per service (still needs a subquery — kept simple here).
+        const visitantesPorServicio = await Promise.all(
+            servicioIds.map(async (sid) => {
+                const count = await prisma.reserva.findMany({
+                    where: {
+                        id_servicio: sid,
+                        estado: { in: ['confirmada', 'pendiente'] },
+                        fecha_creacion: { gte: thirtyDaysAgo }
+                    },
+                    select: { id_usuario: true },
+                    distinct: ['id_usuario']
+                });
+                return { sid, total_visitantes: count.length };
+            })
+        );
+        const visitantesMap = new Map(visitantesPorServicio.map(({ sid, total_visitantes }) => [sid, total_visitantes]));
+
+        return grouped.map((g) => {
+            const s = servicioMap.get(g.id_servicio) ?? {};
+            return {
+                id_servicio: g.id_servicio,
+                nombre_servicio: s.nombre ?? null,
+                descripcion: s.descripcion ?? null,
+                rango_precio: s.rango_precio ?? null,
+                capacidad: s.capacidad ?? null,
+                imagenes: s.imagenes ?? null,
+                id_oferente: s.oferente?.id_oferente ?? null,
+                nombre_negocio: s.oferente?.nombre_negocio ?? null,
+                tipo_oferente: s.oferente?.tipo ?? null,
+                total_reservas: g._count.id_reserva,
+                total_visitantes: visitantesMap.get(g.id_servicio) ?? 0
+            };
+        });
     }
 
-    // Stats completos para analíticas
-static async getStatsAnaliticas() {
-    const [stats] = await db.query(`
-        SELECT
-            COUNT(*) as total_reservas,
-            SUM(CASE WHEN estado = 'pendiente' THEN 1 ELSE 0 END) as pendientes,
-            SUM(CASE WHEN estado = 'confirmada' THEN 1 ELSE 0 END) as confirmadas,
-            SUM(CASE WHEN estado = 'cancelada' THEN 1 ELSE 0 END) as canceladas,
-            SUM(numero_personas) as total_personas
-        FROM reserva
-        WHERE fecha_creacion >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-    `);
+    // ✅ Aggregate estado counts in JS from a single lean query; month histogram unchanged.
+    static async getStatsAnaliticas() {
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    const [reservasPorMes] = await db.query(`
-        SELECT
-            DATE_FORMAT(fecha_creacion, '%Y-%m') as mes,
-            DATE_FORMAT(fecha_creacion, '%b %Y') as mes_label,
-            COUNT(*) as total_reservas
-        FROM reserva
-        WHERE fecha_creacion >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
-        GROUP BY DATE_FORMAT(fecha_creacion, '%Y-%m'), DATE_FORMAT(fecha_creacion, '%b %Y')
-        ORDER BY mes ASC
-    `);
+        const recientes = await prisma.reserva.findMany({
+            where: { fecha_creacion: { gte: thirtyDaysAgo } },
+            select: { estado: true, numero_personas: true }
+        });
 
-    return { ...stats[0], reservasPorMes };
-}
+        const stats = recientes.reduce(
+            (acc, r) => {
+                if (r.estado === 'pendiente') acc.pendientes++;
+                if (r.estado === 'confirmada') acc.confirmadas++;
+                if (r.estado === 'cancelada') acc.canceladas++;
+                acc.total_personas += Number(r.numero_personas);
+                return acc;
+            },
+            { pendientes: 0, confirmadas: 0, canceladas: 0, total_personas: 0 }
+        );
+
+        const sixMonthsAgo = new Date();
+        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+        const reservasHistoricas = await prisma.reserva.findMany({
+            where: { fecha_creacion: { gte: sixMonthsAgo } },
+            select: { fecha_creacion: true }
+        });
+
+        const countsMap = new Map();
+        for (const r of reservasHistoricas) {
+            if (!r.fecha_creacion) continue;
+
+            const d = new Date(r.fecha_creacion);
+            const year = d.getFullYear();
+            const monthStr = String(d.getMonth() + 1).padStart(2, '0');
+            const key = `${year}-${monthStr}`;
+
+            if (!countsMap.has(key)) {
+                const monthLabel = new Intl.DateTimeFormat('en-US', { month: 'short' }).format(d);
+                countsMap.set(key, { mes: key, mes_label: `${monthLabel} ${year}`, total_reservas: 0 });
+            }
+            countsMap.get(key).total_reservas++;
+        }
+
+        const reservasPorMes = Array.from(countsMap.values()).sort((a, b) => a.mes.localeCompare(b.mes));
+
+        return {
+            total_reservas: recientes.length,
+            ...stats,
+            reservasPorMes
+        };
+    }
 }
 
 module.exports = Reserva;

@@ -1,21 +1,33 @@
 const ServicioRestaurante = require('../models/ServicioRestaurante');
 const Oferente = require('../models/Oferente');
+const { servicioDTO, serviciosDTO } = require('../utils/dto');
 
 // Crear
-exports.crearServicio = async (req, res) => {
+exports.crearServicio = async (req, res, next) => {
     try {
-        const {
+        let {
             id_oferente,
             nombre,
             descripcion,
             rango_precio,
             capacidad,
             imagenes,
-            estatus = 1
+            estatus = true
         } = req.body;
 
-        if (!id_oferente || !nombre) {
-            return res.status(400).json({ error: "id_oferente y nombre son requeridos" });
+        id_oferente = parseInt(id_oferente, 10);
+        if (!id_oferente || isNaN(id_oferente) || !nombre) {
+            return res.status(400).json({ error: "id_oferente (número) y nombre son requeridos" });
+        }
+
+        // Authorization check. IDOR prevention.
+        if (req.user && req.user.rol === 'oferente') {
+            const oferenteUser = await Oferente.findByUserId(req.user.id);
+            if (!oferenteUser || oferenteUser.id_oferente !== id_oferente) {
+                return res.status(403).json({ error: "No autorizado para crear servicios para otros oferentes" });
+            }
+        } else if (req.user && req.user.rol !== 'admin' && req.user.rol !== 'moderador') {
+            return res.status(403).json({ error: "No autorizado" });
         }
 
         const oferente = await Oferente.findById(id_oferente);
@@ -41,63 +53,77 @@ exports.crearServicio = async (req, res) => {
             estatus
         });
 
-        res.status(201).json({ message: "Servicio creado exitosamente", servicio });
+        res.status(201).json({ message: "Servicio creado exitosamente", servicio: servicioDTO(servicio) });
     } catch (error) {
-        console.error("Error creating servicio:", error);
-        res.status(500).json({ error: "Error al crear servicio" });
+        next(error);
     }
 };
 
 // traer los servicios
-exports.obtenerServicios = async (req, res) => {
+exports.obtenerServicios = async (req, res, next) => {
     try {
-        const servicios = await ServicioRestaurante.findAll();
+        let servicios;
+
+        // If authenticated oferente, only return their own services
+        if (req.user && req.user.rol === 'oferente') {
+            const oferente = await Oferente.findByUserId(req.user.id);
+            if (!oferente) {
+                return res.status(403).json({ error: 'Perfil de oferente no encontrado' });
+            }
+            servicios = await ServicioRestaurante.findByOfferenteId(oferente.id_oferente);
+        } else {
+            servicios = await ServicioRestaurante.findAll();
+        }
+
         const stats = await ServicioRestaurante.getStats();
 
         res.json({
             total: servicios.length,
             stats,
-            servicios
+            servicios: serviciosDTO(servicios)
         });
     } catch (error) {
-        console.error('Error fetching servicios:', error);
-        res.status(500).json({ error: 'Error al obtener servicios' });
+        next(error);
     }
 };
 
 // servicio por ID
-exports.obtenerServicioPorId = async (req, res) => {
+exports.obtenerServicioPorId = async (req, res, next) => {
     try {
-        const servicio = await ServicioRestaurante.findById(req.params.id);
+        const id = parseInt(req.params.id, 10);
+        if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
+
+        const servicio = await ServicioRestaurante.findById(id);
 
         if (!servicio) {
             return res.status(404).json({ error: 'Servicio no encontrado' });
         }
 
-        res.json(servicio);
+        res.json(servicioDTO(servicio));
     } catch (error) {
-        console.error('Error fetching servicio:', error);
-        res.status(500).json({ error: 'Error al obtener servicio' });
+        next(error);
     }
 };
 
 // traer servicios por oferente ID
-exports.obtenerServiciosPorOferente = async (req, res) => {
+exports.obtenerServiciosPorOferente = async (req, res, next) => {
     try {
-        const servicios = await ServicioRestaurante.findByOfferenteId(req.params.oferenteId);
+        const oferenteId = parseInt(req.params.oferenteId, 10);
+        if (isNaN(oferenteId)) return res.status(400).json({ error: "ID inválido" });
+
+        const servicios = await ServicioRestaurante.findByOfferenteId(oferenteId);
 
         res.json({
             total: servicios.length,
-            servicios
+            servicios: serviciosDTO(servicios)
         });
     } catch (error) {
-        console.error('Error fetching servicios:', error);
-        res.status(500).json({ error: 'Error al obtener servicios' });
+        next(error);
     }
 };
 
-// Actualizar (quitamos id_categoria)
-exports.actualizarServicio = async (req, res) => {
+// Actualizar
+exports.actualizarServicio = async (req, res, next) => {
     try {
         const {
             nombre,
@@ -108,10 +134,36 @@ exports.actualizarServicio = async (req, res) => {
             estatus
         } = req.body;
 
-        const id = req.params.id;
+        const id = parseInt(req.params.id, 10);
+        if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
 
         const servicio = await ServicioRestaurante.findById(id);
         if (!servicio) return res.status(404).json({ error: "Servicio no encontrado" });
+
+        // Authorization check. IDOR prevention.
+        if (req.user) {
+            if (req.user.rol === 'admin' || req.user.rol === 'moderador') {
+                // Admin y moderador pueden modificar cualquier servicio
+            }
+            else if (req.user.rol === 'oferente') {
+                const oferenteUser = await Oferente.findByUserId(req.user.id);
+
+                if (!oferenteUser) {
+                    return res.status(403).json({
+                        error: "Debes crear un perfil de oferente"
+                    });
+                }
+
+                if (oferenteUser.id_oferente !== servicio.id_oferente) {
+                    return res.status(403).json({
+                        error: "No autorizado para modificar servicios de otros oferentes"
+                    });
+                }
+            }
+            else {
+                return res.status(403).json({ error: "No autorizado" });
+            }
+        }
 
         if (capacidad !== undefined && capacidad < 0) {
             return res.status(400).json({ error: "La capacidad no puede ser negativa" });
@@ -126,17 +178,32 @@ exports.actualizarServicio = async (req, res) => {
             estatus
         });
 
-        res.json({ message: "Servicio actualizado exitosamente", servicio: actualizado });
+        res.json({ message: "Servicio actualizado exitosamente", servicio: servicioDTO(actualizado) });
     } catch (error) {
-        console.error("Error updating servicio:", error);
-        res.status(500).json({ error: "Error al actualizar servicio" });
+        next(error);
     }
 };
 
-// elinminar servicio
-exports.eliminarServicio = async (req, res) => {
+// eliminar servicio
+exports.eliminarServicio = async (req, res, next) => {
     try {
-        const deleted = await ServicioRestaurante.delete(req.params.id);
+        const id = parseInt(req.params.id, 10);
+        if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
+
+        const servicio = await ServicioRestaurante.findById(id);
+        if (!servicio) return res.status(404).json({ error: "Servicio no encontrado" });
+
+        // Authorization check
+        if (req.user && req.user.rol === 'oferente') {
+            const oferenteUser = await Oferente.findByUserId(req.user.id);
+            if (!oferenteUser || oferenteUser.id_oferente !== servicio.id_oferente) {
+                return res.status(403).json({ error: "No autorizado para eliminar servicios de otros oferentes" });
+            }
+        } else if (req.user && req.user.rol !== 'admin') {
+            return res.status(403).json({ error: "No autorizado" });
+        }
+
+        const deleted = await ServicioRestaurante.delete(id);
 
         if (!deleted) {
             return res.status(404).json({ error: 'Servicio no encontrado' });
@@ -144,10 +211,9 @@ exports.eliminarServicio = async (req, res) => {
 
         res.json({
             message: 'Servicio eliminado exitosamente',
-            id_servicio: req.params.id
+            id_servicio: id
         });
     } catch (error) {
-        console.error('Error deleting servicio:', error);
-        res.status(500).json({ error: 'Error al eliminar servicio' });
+        next(error);
     }
 };
