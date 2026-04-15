@@ -24,7 +24,7 @@ app.get('/api/announcements/maintenance', async (req, res, next) => {
     try {
         const group = req.headers['x-frontend-version'] || 'stable';
         const message = await redis.get(`maintenance:announcement:${group}`);
-        
+
         if (message) {
             res.json({ show_banner: true, message });
         } else {
@@ -37,7 +37,7 @@ app.get('/api/announcements/maintenance', async (req, res, next) => {
 
 app.get('/api/announcements', async (req, res, next) => {
     try {
-        const rows = await prisma.announcements.findMany({
+        const rows = await prisma.announcement.findMany({
             where: { is_active: true },
             orderBy: { event_date: 'asc' }
         });
@@ -52,7 +52,7 @@ app.get('/api/announcements/:id', async (req, res, next) => {
         const id = parseInt(req.params.id, 10);
         if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
 
-        const row = await prisma.announcements.findUnique({
+        const row = await prisma.announcement.findUnique({
             where: { id }
         });
         if (!row) {
@@ -67,14 +67,14 @@ app.get('/api/announcements/:id', async (req, res, next) => {
 app.post('/api/announcements', verifyAdmin, async (req, res, next) => {
     try {
         const { title, description, image_url, event_date } = req.body;
-        
+
         let validDate = null;
         if (event_date) {
             validDate = new Date(`${event_date}T00:00:00Z`);
             if (isNaN(validDate.getTime())) return res.status(400).json({ error: "Fecha inválida" });
         }
 
-        const result = await prisma.announcements.create({
+        const result = await prisma.announcement.create({
             data: {
                 title,
                 description,
@@ -94,14 +94,14 @@ app.put('/api/announcements/:id', verifyAdmin, async (req, res, next) => {
         if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
 
         const { title, description, image_url, event_date, is_active } = req.body;
-        
+
         let validDate = null;
         if (event_date) {
             validDate = new Date(`${event_date}T00:00:00Z`);
             if (isNaN(validDate.getTime())) return res.status(400).json({ error: "Fecha inválida" });
         }
 
-        await prisma.announcements.update({
+        await prisma.announcement.update({
             where: { id },
             data: {
                 title,
@@ -122,7 +122,7 @@ app.delete('/api/announcements/:id', verifyAdmin, async (req, res, next) => {
         const id = parseInt(req.params.id, 10);
         if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
 
-        await prisma.announcements.delete({
+        await prisma.announcement.delete({
             where: { id }
         });
         res.json({ message: 'Announcement deleted' });
