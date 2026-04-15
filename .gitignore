@@ -85,3 +85,5 @@ typings/
 # Brain/Artifacts (if inside project)
 .gemini/
 .antigravity/
+.env
+node_modules/
