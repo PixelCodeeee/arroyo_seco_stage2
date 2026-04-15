@@ -3,11 +3,11 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const { prisma } = require('./config/db');
-const { verifyToken, verifyRole } = require('./middleware/auth');
 const { reservationLimiter } = require('./middleware/rateLimiter');
 const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
+app.set('trust proxy', 1);
 const PORT = process.env.PORT || 5006;
 
 // Middlewares
