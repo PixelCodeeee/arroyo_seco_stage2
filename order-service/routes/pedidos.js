@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const pedidoController = require('../controllers/pedidoController');
-const { verifyToken, verifyAdmin, verifyoferente } = require('../middleware/auth');
+const { verifyToken, verifyAdmin, verifyoferente, verifyRole } = require('../middleware/auth');
 
 // Public or Protected? Protected usually.
 // Crear pedido (Authenticated users)
@@ -23,7 +23,7 @@ router.get('/recomendaciones/top-productos', pedidoController.getTopProductos);
 // Recomendaciones - top productos
 
 // Analíticas (solo admin)
-router.get('/analiticas/stats', verifyToken, pedidoController.getStatsAnaliticas);
+router.get('/analiticas/stats', verifyToken, verifyRole(['admin', 'moderador']), pedidoController.getStatsAnaliticas);
 
 // Shared/General
 router.get('/:id', verifyToken, pedidoController.obtenerPedidoPorId); // Checks ownership inside? No, controller just gets by ID. 

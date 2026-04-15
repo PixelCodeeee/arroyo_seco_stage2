@@ -287,12 +287,12 @@ class Reserva {
     }
 
     // ✅ Aggregate estado counts in JS from a single lean query; month histogram unchanged.
-    static async getStatsAnaliticas() {
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    static async getStatsAnaliticas(days = 30) {
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - days);
 
         const recientes = await prisma.reserva.findMany({
-            where: { fecha_creacion: { gte: thirtyDaysAgo } },
+            where: { fecha_creacion: { gte: startDate } },
             select: { estado: true, numero_personas: true }
         });
 

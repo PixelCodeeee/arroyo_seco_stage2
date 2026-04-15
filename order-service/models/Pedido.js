@@ -263,12 +263,12 @@ class Pedido {
             });
     }
 
-    static async getStatsAnaliticas() {
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    static async getStatsAnaliticas(days = 30) {
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - days);
 
         const recientes = await prisma.pedido.findMany({
-            where: { fecha_creacion: { gte: thirtyDaysAgo } },
+            where: { fecha_creacion: { gte: startDate } },
             select: { estado: true, monto_total: true }
         });
 

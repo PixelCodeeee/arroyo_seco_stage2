@@ -505,7 +505,8 @@ exports.getTopServicios = async (req, res, next) => {
 // Stats para analíticas (solo admin)
 exports.getStatsAnaliticas = async (req, res, next) => {
     try {
-        const stats = await Reserva.getStatsAnaliticas();
+        const days = parseInt(req.query.days) || 30;
+        const stats = await Reserva.getStatsAnaliticas(days);
         res.json(stats);
     } catch (error) {
         next(error);

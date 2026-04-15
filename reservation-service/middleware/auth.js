@@ -112,8 +112,20 @@ const verifyAdmin = (req, res, next) => {
     }
 };
 
+// Verify if user has one of the allowed roles (must be chained AFTER verifyToken)
+const verifyRole = (allowedRoles) => (req, res, next) => {
+    if (!req.user || !allowedRoles.includes(req.user.rol)) {
+        return res.status(403).json({
+            success: false,
+            message: `Acceso restringido a roles: ${allowedRoles.join(', ')}`
+        });
+    }
+    next();
+};
+
 module.exports = {
     verifyToken,
     verifyoferente,
-    verifyAdmin
+    verifyAdmin,
+    verifyRole
 };

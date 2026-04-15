@@ -334,7 +334,8 @@ exports.getTopProductos = async (req, res, next) => {
 // Stats para analíticas (solo admin)
 exports.getStatsAnaliticas = async (req, res, next) => {
     try {
-        const stats = await Pedido.getStatsAnaliticas();
+        const days = parseInt(req.query.days) || 30;
+        const stats = await Pedido.getStatsAnaliticas(days);
         res.json(stats);
     } catch (error) {
         next(error);
