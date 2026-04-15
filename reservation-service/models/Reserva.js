@@ -244,7 +244,7 @@ class Reserva {
 
         const servicioIds = grouped.map((g) => g.id_servicio);
 
-        const servicios = await prisma.servicio.findMany({
+        const servicios = await prisma.servicio_restaurante.findMany({
             where: { id_servicio: { in: servicioIds } },
             include: { oferente: true }
         });

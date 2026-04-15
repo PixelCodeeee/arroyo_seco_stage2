@@ -55,7 +55,17 @@ const create = async (req, res) => {
 const update = async (req, res) => {
     try {
         const id = parseInt(req.params.id);
+        if (isNaN(id)) return res.status(400).json({ error: 'ID inválido' });
+
         const { title, description, image_url, event_date, is_active } = req.body;
+
+        let parsedDate = null;
+        if (event_date) {
+            parsedDate = new Date(`${event_date}T00:00:00Z`);
+            if (isNaN(parsedDate.getTime())) {
+                return res.status(400).json({ error: 'Fecha inválida' });
+            }
+        }
 
         const data = await prisma.announcement.update({
             where: { id },
@@ -63,13 +73,14 @@ const update = async (req, res) => {
                 title,
                 description,
                 image_url,
-                event_date: event_date ? new Date(event_date) : null,
-                is_active
+                event_date: parsedDate,
+                is_active: is_active !== undefined ? is_active : undefined
             }
         });
 
         res.json(data);
     } catch (error) {
+        console.error('Error updating announcement:', error);
         res.status(500).json({ error: 'Error interno del servidor' });
     }
 };
