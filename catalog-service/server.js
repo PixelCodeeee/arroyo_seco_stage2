@@ -19,13 +19,16 @@ app.use(express.urlencoded({ extended: true }));
 const { reservationLimiter } = require('./middleware/rateLimiter');
 app.use('/api', reservationLimiter);
 
-// Debug Middleware
-app.use((req, res, next) => {
-    console.log(`[Catalog] ${req.method} ${req.path}`);
-    console.log('[Catalog] Headers:', req.headers);
-    console.log('[Catalog] Body:', req.body);
-    next();
-});
+const helmet = require('helmet');
+app.use(helmet({ crossOriginResourcePolicy: false }));
+
+// Debug Middleware — disabled in production to avoid logging tokens/sensitive data
+if (process.env.NODE_ENV !== 'production') {
+    app.use((req, res, next) => {
+        console.log(`[Catalog] ${req.method} ${req.path}`);
+        next();
+    });
+}
 
 // Routes
 app.use('/api/categorias', require('./routes/categorias'));

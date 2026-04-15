@@ -83,9 +83,7 @@ exports.createOrder = async (req, res, next) => {
     console.log('🔍 PREFERENCE REQUEST:', JSON.stringify({
       usando_oferente: usandoOferente,
       id_oferente,
-      oferente_estado: oferente?.mp_estado,
-      token_prefix: oferente?.mp_access_token?.substring(0, 15),
-      preferenceData
+      items_count: preferenceData.items.length
     }, null, 2));
 
     const response = await client.post('/checkout/preferences', preferenceData);
@@ -353,16 +351,4 @@ exports.getPublicConfig = (req, res) => {
   return res.json({ public_key: MP_CONFIG.publicKey });
 };
 
-// ─────────────────────────────────────────────────────────────────────
-// 9. DEBUG — verificar variables de entorno (REMOVER EN PRODUCCIÓN FINAL)
-//    Ruta: GET /api/mercadopago/debug
-// ─────────────────────────────────────────────────────────────────────
-exports.debugEnv = (req, res) => {
-  res.json({
-    token_prefix: process.env.MP_ACCESS_TOKEN?.substring(0, 15),
-    public_key_prefix: process.env.MP_PUBLIC_KEY?.substring(0, 15),
-    app_url: APP_URL,
-    redirect_uri: process.env.MP_REDIRECT_URI,
-    node_env: process.env.NODE_ENV
-  });
-};
+// debug endpoint removed for security

@@ -6,7 +6,15 @@ exports.crearOferente = async (req, res) => {
     try {
         console.log('[Controller] crearOferente called');
         console.log('[Controller] req.body:', req.body);
-        const { id_usuario, nombre_negocio, direccion, tipo, horario_disponibilidad, imagen, telefono } = req.body || {};
+        const { nombre_negocio, direccion, tipo, horario_disponibilidad, imagen, telefono } = req.body || {};
+        let { id_usuario } = req.body || {};
+
+        // IDOR prevention: oferente role must use their own user ID
+        if (req.user && req.user.rol === 'oferente') {
+            id_usuario = req.user.id;
+        } else if (req.user && req.user.rol !== 'admin' && req.user.rol !== 'moderador') {
+            return res.status(403).json({ error: 'No autorizado para crear oferentes' });
+        }
 
         if (!id_usuario || !nombre_negocio || !tipo) {
             return res.status(400).json({
@@ -45,7 +53,7 @@ exports.crearOferente = async (req, res) => {
 
     } catch (error) {
         console.error('Error creating oferente:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: 'Error interno del servidor' });
     }
 };
 
@@ -64,7 +72,7 @@ exports.obtenerOferentes = async (req, res) => {
 
     } catch (error) {
         console.error('Error fetching oferentes:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: 'Error interno del servidor' });
     }
 };
 
@@ -80,7 +88,7 @@ exports.obtenerOferentePorId = async (req, res) => {
 
     } catch (error) {
         console.error('Error fetching oferente:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: 'Error interno del servidor' });
     }
 };
 
@@ -96,7 +104,7 @@ exports.obtenerOferentePorUsuario = async (req, res) => {
 
     } catch (error) {
         console.error('Error fetching oferente:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: 'Error interno del servidor' });
     }
 };
 
@@ -137,7 +145,7 @@ exports.actualizarOferente = async (req, res) => {
 
     } catch (error) {
         console.error('Error updating oferente:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: 'Error interno del servidor' });
     }
 };
 
@@ -168,7 +176,7 @@ exports.actualizarEstadoOferente = async (req, res) => {
 
     } catch (error) {
         console.error('Error updating estado:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: 'Error interno del servidor' });
     }
 };
 
@@ -184,6 +192,6 @@ exports.eliminarOferente = async (req, res) => {
 
     } catch (error) {
         console.error('Error deleting oferente:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: 'Error interno del servidor' });
     }
 };

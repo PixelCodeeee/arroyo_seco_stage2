@@ -1,6 +1,11 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const { prisma } = require('./config/db');
+const { verifyToken, verifyRole } = require('./middleware/auth');
+const { reservationLimiter } = require('./middleware/rateLimiter');
+const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
 const PORT = process.env.PORT || 5006;
@@ -16,120 +21,17 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
+app.use(helmet({ crossOriginResourcePolicy: false }));
 app.use(express.json());
-app.use('/api', reservationLimiter); // Protect everything against spam
+app.use('/api', reservationLimiter);
 
-
-app.get('/api/announcements/maintenance', async (req, res, next) => {
-    try {
-        const group = req.headers['x-frontend-version'] || 'stable';
-        const message = await redis.get(`maintenance:announcement:${group}`);
-
-        if (message) {
-            res.json({ show_banner: true, message });
-        } else {
-            res.json({ show_banner: false, message: null });
-        }
-    } catch (error) {
-        next(error);
-    }
+// Health check
+app.get('/health', (req, res) => {
+    res.json({ status: 'OK', service: 'announcements-service' });
 });
 
-app.get('/api/announcements', async (req, res, next) => {
-    try {
-        const rows = await prisma.announcement.findMany({
-            where: { is_active: true },
-            orderBy: { event_date: 'asc' }
-        });
-        res.json(rows);
-    } catch (error) {
-        next(error);
-    }
-});
-
-app.get('/api/announcements/:id', async (req, res, next) => {
-    try {
-        const id = parseInt(req.params.id, 10);
-        if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
-
-        const row = await prisma.announcement.findUnique({
-            where: { id }
-        });
-        if (!row) {
-            return res.status(404).json({ message: 'Announcement not found' });
-        }
-        res.json(row);
-    } catch (error) {
-        next(error);
-    }
-});
-
-app.post('/api/announcements', verifyAdmin, async (req, res, next) => {
-    try {
-        const { title, description, image_url, event_date } = req.body;
-
-        let validDate = null;
-        if (event_date) {
-            validDate = new Date(`${event_date}T00:00:00Z`);
-            if (isNaN(validDate.getTime())) return res.status(400).json({ error: "Fecha inválida" });
-        }
-
-        const result = await prisma.announcement.create({
-            data: {
-                title,
-                description,
-                image_url,
-                event_date: validDate
-            }
-        });
-        res.status(201).json({ message: 'Announcement created', id: result.id });
-    } catch (error) {
-        next(error);
-    }
-});
-
-app.put('/api/announcements/:id', verifyAdmin, async (req, res, next) => {
-    try {
-        const id = parseInt(req.params.id, 10);
-        if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
-
-        const { title, description, image_url, event_date, is_active } = req.body;
-
-        let validDate = null;
-        if (event_date) {
-            validDate = new Date(`${event_date}T00:00:00Z`);
-            if (isNaN(validDate.getTime())) return res.status(400).json({ error: "Fecha inválida" });
-        }
-
-        await prisma.announcement.update({
-            where: { id },
-            data: {
-                title,
-                description,
-                image_url,
-                event_date: validDate,
-                is_active: is_active !== undefined ? is_active : true
-            }
-        });
-        res.json({ message: 'Announcement updated' });
-    } catch (error) {
-        next(error);
-    }
-});
-
-app.delete('/api/announcements/:id', verifyAdmin, async (req, res, next) => {
-    try {
-        const id = parseInt(req.params.id, 10);
-        if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
-
-        await prisma.announcement.delete({
-            where: { id }
-        });
-        res.json({ message: 'Announcement deleted' });
-    } catch (error) {
-        next(error);
-    }
-});
+// Routes
+app.use('/api/announcements', require('./routes/announcement'));
 
 // Error handling middleware
 app.use(errorHandler);

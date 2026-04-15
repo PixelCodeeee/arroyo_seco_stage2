@@ -13,6 +13,10 @@ const corsOptions = {
     optionsSuccessStatus: 200
 };
 app.use(cors(corsOptions));
+
+const helmet = require('helmet');
+app.use(helmet({ crossOriginResourcePolicy: false }));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

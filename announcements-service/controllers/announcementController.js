@@ -8,7 +8,7 @@ const getPublicAnnouncement = async (req, res) => {
         });
         res.json(data);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: 'Error interno del servidor' });
     }
 };
 
@@ -19,7 +19,7 @@ const getAll = async (req, res) => {
         });
         res.json(data);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: 'Error interno del servidor' });
     }
 };
 
@@ -29,7 +29,7 @@ const getById = async (req, res) => {
         const data = await prisma.announcement.findUnique({ where: { id } });
         res.json(data);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: 'Error interno del servidor' });
     }
 };
 
@@ -48,7 +48,7 @@ const create = async (req, res) => {
 
         res.status(201).json(data);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: 'Error interno del servidor' });
     }
 };
 
@@ -70,7 +70,7 @@ const update = async (req, res) => {
 
         res.json(data);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: 'Error interno del servidor' });
     }
 };
 
@@ -84,7 +84,7 @@ const remove = async (req, res) => {
 
         res.json({ message: 'Eliminado correctamente' });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: 'Error interno del servidor' });
     }
 };
 

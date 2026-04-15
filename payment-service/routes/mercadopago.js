@@ -9,7 +9,7 @@ router.get('/config', ctrl.getPublicConfig);
 
 // ── CARRITO / COMPRADOR ───────────────────────────────────────────────
 // POST /api/mercadopago/create-order
-router.post('/create-order', ctrl.createOrder);
+router.post('/create-order', verifyToken, ctrl.createOrder);
 
 // POST /api/mercadopago/capture-order
 router.post('/capture-order', verifyToken, ctrl.captureOrder);
@@ -30,6 +30,6 @@ router.get('/mp/callback', ctrl.mpCallback);
 // GET /api/mercadopago/mp/estado
 router.get('/mp/estado', verifyToken, ctrl.getMpEstado);
 
-router.get('/debug', ctrl.debugEnv);
+// debug route removed for security
 
 module.exports = router;
