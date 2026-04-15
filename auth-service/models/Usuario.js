@@ -20,7 +20,6 @@ class Usuario {
             }
         });
 
-        // The original code returned a specific object omitting the hash:
         return {
             id_usuario: usuario.id_usuario,
             correo: usuario.correo,
@@ -124,9 +123,10 @@ class Usuario {
         const turistas = await db.usuario.count({ where: { rol: 'turista' } });
         const oferentes = await db.usuario.count({ where: { rol: 'oferente' } });
         const admins = await db.usuario.count({ where: { rol: 'admin' } });
+        const moderadores = await db.usuario.count({ where: { rol: 'moderador' } });
         const activos = await db.usuario.count({ where: { esta_activo: true } });
         
-        return { total_usuarios, turistas, oferentes, admins, activos };
+        return { total_usuarios, turistas, oferentes, admins, moderadores, activos };
     }
 
     // Usuarios registrados por mes (últimos 6 meses)
@@ -152,7 +152,6 @@ class Usuario {
             
             if (!countsMap.has(key)) {
                 let monthLabel = new Intl.DateTimeFormat('en-US', { month: 'short' }).format(reqDate);
-                // To behave like MySQL '%b %Y' (e.g. 'Oct 2023')
                 const label = `${monthLabel} ${year}`;
                 countsMap.set(key, { mes: key, mes_label: label, total: 0 });
             }

@@ -98,25 +98,31 @@ exports.obtenerPedidos = async (req, res, next) => {
         let pedidos = [];
         let stats = null;
 
-        if (req.user.rol === 'admin') {
-            pedidos = await Pedido.findAll();
-            stats = await Pedido.getStats();
-        } else if (req.user.rol === 'turista') {
-            pedidos = await Pedido.findByUsuarioId(req.user.id);
-        } else if (req.user.rol === 'oferente') {
-            if (!req.user.oferenteId) {
-                // Fetch oferenteId dynamically if not injected by verifyoferente
-                const { prisma } = require('../config/db');
-                const oferentes = await prisma.oferente.findMany({ where: { id_usuario: req.user.id } });
-                if (oferentes.length > 0) {
-                    pedidos = await Pedido.findByOferenteId(oferentes[0].id_oferente);
-                    stats = await Pedido.getStatsByOferente(oferentes[0].id_oferente);
-                }
-            } else {
-                pedidos = await Pedido.findByOferenteId(req.user.oferenteId);
-                stats = await Pedido.getStatsByOferente(req.user.oferenteId);
-            }
+        if (req.user.rol === 'admin' || req.user.rol === 'moderador') {
+    pedidos = await Pedido.findAll();
+    stats = await Pedido.getStats();
+
+} else if (req.user.rol === 'turista') {
+    pedidos = await Pedido.findByUsuarioId(req.user.id);
+
+} else if (req.user.rol === 'oferente') {
+    if (!req.user.oferenteId) {
+        // Obtener oferente dinámicamente
+        const { prisma } = require('../config/db');
+        const oferentes = await prisma.oferente.findMany({
+            where: { id_usuario: req.user.id }
+        });
+
+        if (oferentes.length > 0) {
+            pedidos = await Pedido.findByOferenteId(oferentes[0].id_oferente);
+            stats = await Pedido.getStatsByOferente(oferentes[0].id_oferente);
         }
+
+    } else {
+        pedidos = await Pedido.findByOferenteId(req.user.oferenteId);
+        stats = await Pedido.getStatsByOferente(req.user.oferenteId);
+    }
+}
 
         res.json({
             total: pedidos.length,

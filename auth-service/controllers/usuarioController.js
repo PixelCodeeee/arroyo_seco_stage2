@@ -6,7 +6,11 @@ const { usuarioDTO, usuariosDTO } = require('../utils/dto');
 const redis = require('../utils/redis');
 
 // Allowed roles
-const ROLES_VALIDOS = ['turista', 'oferente', 'admin'];
+const ROLES_VALIDOS = ['turista', 'oferente', 'admin', 'moderador'];
+
+// Helpers de rol
+const esAdmin = (rol) => rol === 'admin';
+const esAdminOModerador = (rol) => rol === 'admin' || rol === 'moderador';
 
 // CREATE - Register new user (with 2FA)
 exports.crearUsuario = async (req, res, next) => {
@@ -82,7 +86,7 @@ exports.loginUsuario = async (req, res, next) => {
                 error: 'Credenciales inválidas'
             });
         }
-        
+
         if (!usuario.esta_activo) {
             return res.status(403).json({
                 error: 'Cuenta no verificada. Por favor regístrate nuevamente.'
@@ -136,7 +140,7 @@ exports.verify2FA = async (req, res, next) => {
             });
         }
 
-        // Activates the user since 2FA is verified successfully 
+        // Activates the user since 2FA is verified successfully
         if (!usuario.esta_activo) {
             usuario = await Usuario.update(userId, { esta_activo: true });
         }
@@ -153,10 +157,8 @@ exports.verify2FA = async (req, res, next) => {
 
         // Session tracking for Canary Deployments
         const group = req.headers['x-frontend-version'] || 'stable';
-        const jwtTtlSeconds = 24 * 60 * 60; // 24 hours
-        // Normally tying to token involves an ID. We can use the hashed token signature, or just randomly generate a session ID. 
-        // JWT itself is the key or we can track by user ID. Let's use user ID combined with a prefix.
-        const tokenId = usuario.id_usuario; 
+        const jwtTtlSeconds = 24 * 60 * 60;
+        const tokenId = usuario.id_usuario;
         await redis.setex(`session:${tokenId}`, jwtTtlSeconds, group);
         await redis.sadd(`active:${group}`, tokenId);
         await redis.expire(`active:${group}`, jwtTtlSeconds);
@@ -175,9 +177,9 @@ exports.verify2FA = async (req, res, next) => {
 exports.logoutUsuario = async (req, res, next) => {
     try {
         if (!req.user || !req.user.id) {
-             return res.status(401).json({ error: 'No autenticado' });
+            return res.status(401).json({ error: 'No autenticado' });
         }
-        
+
         const tokenId = req.user.id;
         const group = await redis.get(`session:${tokenId}`);
         if (group) {
@@ -258,14 +260,16 @@ exports.resetPassword = async (req, res, next) => {
     }
 };
 
+// Solo el propio usuario o admin puede cambiar contraseña (moderador NO)
 exports.updatePassword = async (req, res, next) => {
     try {
         const { contrasenaActual, nuevaContrasena } = req.body;
         const userId = parseInt(req.params.id, 10);
 
-        if (isNaN(userId)) return res.status(400).json({ error: "ID inválido" });
+        if (isNaN(userId)) return res.status(400).json({ error: 'ID inválido' });
 
-        if (req.user.id !== userId && req.user.rol !== 'admin') {
+        // Moderador no puede cambiar contraseñas de otros usuarios
+        if (req.user.id !== userId && !esAdmin(req.user.rol)) {
             return res.status(403).json({ error: 'No autorizado para cambiar la contraseña de este usuario' });
         }
 
@@ -287,6 +291,7 @@ exports.updatePassword = async (req, res, next) => {
     }
 };
 
+// Admin y moderador pueden ver todos los usuarios
 exports.obtenerUsuarios = async (req, res, next) => {
     try {
         const usuarios = await Usuario.findAll();
@@ -302,16 +307,13 @@ exports.obtenerUsuarios = async (req, res, next) => {
 exports.obtenerUsuarioPorId = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
-        if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
+        if (isNaN(id)) return res.status(400).json({ error: 'ID inválido' });
 
         const usuario = await Usuario.findById(id);
 
         if (!usuario) {
             return res.status(404).json({ error: 'Usuario no encontrado' });
         }
-
-        // Return safely without IDOR protection here as profiles might be safe to view 
-        // Or if strictly private, we could add: if (req.user.rol === 'turista' && req.user.id !== id) error;
 
         res.json(usuarioDTO(usuario));
     } catch (error) {
@@ -323,10 +325,11 @@ exports.actualizarUsuario = async (req, res, next) => {
     try {
         const { correo, contrasena, nombre, rol, esta_activo } = req.body;
         const userId = parseInt(req.params.id, 10);
-        if (isNaN(userId)) return res.status(400).json({ error: "ID inválido" });
+        if (isNaN(userId)) return res.status(400).json({ error: 'ID inválido' });
 
-        if (req.user && req.user.rol !== 'admin' && req.user.id !== userId) {
-             return res.status(403).json({ error: 'No autorizado' });
+        // Moderador puede editar usuarios pero no a sí mismo más allá de lo permitido
+        if (!esAdminOModerador(req.user.rol) && req.user.id !== userId) {
+            return res.status(403).json({ error: 'No autorizado' });
         }
 
         const existingUser = await Usuario.findById(userId);
@@ -334,16 +337,26 @@ exports.actualizarUsuario = async (req, res, next) => {
             return res.status(404).json({ error: 'Usuario no encontrado' });
         }
 
-        // Email changes must go through the dedicated 2FA verification flow.
+        // Solo admin puede cambiar roles
+        if (rol !== undefined && !esAdmin(req.user.rol)) {
+            return res.status(403).json({ error: 'Solo el admin puede cambiar roles' });
+        }
+
+        // Solo admin puede activar/desactivar usuarios
+        if (esta_activo !== undefined && !esAdmin(req.user.rol)) {
+            return res.status(403).json({ error: 'Solo el admin puede activar o desactivar usuarios' });
+        }
+
+        // Moderador no puede cambiar contraseñas
+        if (contrasena !== undefined && !esAdmin(req.user.rol) && req.user.id !== userId) {
+            return res.status(403).json({ error: 'No autorizado para cambiar la contraseña de este usuario' });
+        }
+
+        // Cambio de correo debe ir por flujo seguro
         if (correo && correo !== existingUser.correo) {
             return res.status(400).json({
                 error: 'Para cambiar el correo, debe utilizar el flujo de verificación de correo seguro (/cambio-correo/solicitar)'
             });
-        }
-
-        // Correo is blocked above, but we keep this empty shell just in case
-        if (correo && correo !== existingUser.correo) {
-             // Blocked previously
         }
 
         if (rol && !ROLES_VALIDOS.includes(rol)) {
@@ -381,13 +394,14 @@ exports.actualizarUsuario = async (req, res, next) => {
     }
 };
 
+// Solo admin puede eliminar usuarios (moderador NO)
 exports.eliminarUsuario = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
-        if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
+        if (isNaN(id)) return res.status(400).json({ error: 'ID inválido' });
 
-        if (req.user && req.user.rol !== 'admin' && req.user.id !== id) {
-             return res.status(403).json({ error: 'No autorizado' });
+        if (!esAdmin(req.user.rol) && req.user.id !== id) {
+            return res.status(403).json({ error: 'No autorizado para eliminar usuarios' });
         }
 
         const deleted = await Usuario.delete(id);
@@ -405,7 +419,7 @@ exports.eliminarUsuario = async (req, res, next) => {
     }
 };
 
-// Stats para analíticas (solo admin)
+// Admin y moderador pueden ver stats
 exports.getStats = async (req, res, next) => {
     try {
         const stats = await Usuario.getStats();
@@ -421,11 +435,11 @@ exports.solicitarCambioCorreo = async (req, res, next) => {
         const userId = parseInt(req.params.id, 10);
         const { nuevoCorreo } = req.body;
 
-        if (isNaN(userId)) return res.status(400).json({ error: "ID inválido" });
-        if (!nuevoCorreo) return res.status(400).json({ error: "El nuevo correo es requerido" });
+        if (isNaN(userId)) return res.status(400).json({ error: 'ID inválido' });
+        if (!nuevoCorreo) return res.status(400).json({ error: 'El nuevo correo es requerido' });
 
-        if (req.user && req.user.rol !== 'admin' && req.user.id !== userId) {
-             return res.status(403).json({ error: 'No autorizado' });
+        if (!esAdminOModerador(req.user.rol) && req.user.id !== userId) {
+            return res.status(403).json({ error: 'No autorizado' });
         }
 
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -441,13 +455,9 @@ exports.solicitarCambioCorreo = async (req, res, next) => {
         const usuario = await Usuario.findById(userId);
         if (!usuario) return res.status(404).json({ error: 'Usuario no encontrado' });
 
-        // Generate 6-digit verification code using Codigo2FA module natively
         const codigo = await Codigo2FA.create(userId);
-
-        // Send email
         await emailService.sendEmailChangeCode(nuevoCorreo, codigo, usuario.nombre);
 
-        // Sign token encapsulating request memory
         const changeToken = jwt.sign(
             { userId, nuevoCorreo, type: 'email_change' },
             process.env.JWT_SECRET,
@@ -469,11 +479,11 @@ exports.verificarCambioCorreo = async (req, res, next) => {
         const userId = parseInt(req.params.id, 10);
         const { changeToken, codigo } = req.body;
 
-        if (isNaN(userId)) return res.status(400).json({ error: "ID inválido" });
-        if (!changeToken || !codigo) return res.status(400).json({ error: "Token y código son requeridos" });
+        if (isNaN(userId)) return res.status(400).json({ error: 'ID inválido' });
+        if (!changeToken || !codigo) return res.status(400).json({ error: 'Token y código son requeridos' });
 
-        if (req.user && req.user.rol !== 'admin' && req.user.id !== userId) {
-             return res.status(403).json({ error: 'No autorizado' });
+        if (!esAdminOModerador(req.user.rol) && req.user.id !== userId) {
+            return res.status(403).json({ error: 'No autorizado' });
         }
 
         let decoded;

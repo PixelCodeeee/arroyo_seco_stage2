@@ -1,24 +1,24 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-require('dotenv').config();
-
-const prisma = require('./config/db');
-const { verifyAdmin } = require('./middleware/auth');
-const { reservationLimiter } = require('./middleware/rateLimiter');
-const errorHandler = require('./middleware/errorHandler');
-const redis = require('./utils/redis');
 
 const app = express();
-const allowedOrigins = process.env.NODE_ENV === 'production' ? ['https://arroyoseco.online'] : ['https://arroyoseco.online', 'http://localhost:5173'];
+const PORT = process.env.PORT || 5006;
+
+// Middlewares
+const allowedOrigins = process.env.NODE_ENV === 'production'
+    ? ['https://arroyoseco.online']
+    : ['https://arroyoseco.online', 'http://localhost:5173'];
+
 const corsOptions = {
     origin: process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : allowedOrigins,
     optionsSuccessStatus: 200
 };
+
 app.use(cors(corsOptions));
 app.use(express.json());
 app.use('/api', reservationLimiter); // Protect everything against spam
 
-const PORT = process.env.PORT || 5006;
 
 app.get('/api/announcements/maintenance', async (req, res, next) => {
     try {
@@ -135,5 +135,5 @@ app.delete('/api/announcements/:id', verifyAdmin, async (req, res, next) => {
 app.use(errorHandler);
 
 app.listen(PORT, () => {
-    console.log(`🚀 Announcements Service running on port ${PORT}`);
+    console.log(`Announcements service running on port ${PORT}`);
 });

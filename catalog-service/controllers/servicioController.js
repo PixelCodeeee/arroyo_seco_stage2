@@ -26,7 +26,7 @@ exports.crearServicio = async (req, res, next) => {
             if (!oferenteUser || oferenteUser.id_oferente !== id_oferente) {
                 return res.status(403).json({ error: "No autorizado para crear servicios para otros oferentes" });
             }
-        } else if (req.user && req.user.rol !== 'admin') {
+        } else if (req.user && req.user.rol !== 'admin' && req.user.rol !== 'moderador') {
             return res.status(403).json({ error: "No autorizado" });
         }
 
@@ -122,7 +122,7 @@ exports.obtenerServiciosPorOferente = async (req, res, next) => {
     }
 };
 
-// Actualizar (quitamos id_categoria)
+// Actualizar
 exports.actualizarServicio = async (req, res, next) => {
     try {
         const {
@@ -142,8 +142,8 @@ exports.actualizarServicio = async (req, res, next) => {
 
         // Authorization check. IDOR prevention.
         if (req.user) {
-            if (req.user.rol === 'admin') {
-                // Admin puede modificar cualquier servicio
+            if (req.user.rol === 'admin' || req.user.rol === 'moderador') {
+                // Admin y moderador pueden modificar cualquier servicio
             }
             else if (req.user.rol === 'oferente') {
                 const oferenteUser = await Oferente.findByUserId(req.user.id);
@@ -184,7 +184,7 @@ exports.actualizarServicio = async (req, res, next) => {
     }
 };
 
-// elinminar servicio
+// eliminar servicio
 exports.eliminarServicio = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
