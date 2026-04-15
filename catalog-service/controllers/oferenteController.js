@@ -115,7 +115,7 @@ exports.actualizarOferente = async (req, res) => {
             if (!oferenteDelUsuario || oferenteDelUsuario.id_oferente !== parseInt(oferenteId, 10)) {
                 return res.status(403).json({ error: "No autorizado para modificar perfiles de otros oferentes" });
             }
-        } else if (req.user && req.user.rol !== 'admin') {
+        } else if (req.user && req.user.rol !== 'admin' && req.user.rol !== 'moderador') {
             return res.status(403).json({ error: "No autorizado" });
         }
 

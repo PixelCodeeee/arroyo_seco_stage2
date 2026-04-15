@@ -1,14 +1,16 @@
 const express = require('express');
 const router = express.Router();
 const categoriaController = require('../controllers/categoriaController');
-const { verifyToken, verifyAdmin, verifyoferente } = require('../middleware/auth');
+const { verifyToken, verifyAdmin, verifyAdminOrModerador } = require('../middleware/auth');
 
 // Public
 router.get('/', categoriaController.obtenerCategorias);
 
-// Protected
-router.post('/', verifyToken, verifyAdmin, categoriaController.crearCategoria);
-router.put('/:id', verifyToken, verifyAdmin, categoriaController.actualizarCategoria);
+// Admin o Moderador
+router.post('/', verifyToken, verifyAdminOrModerador, categoriaController.crearCategoria);
+router.put('/:id', verifyToken, verifyAdminOrModerador, categoriaController.actualizarCategoria);
+
+// Solo Admin
 router.delete('/:id', verifyToken, verifyAdmin, categoriaController.eliminarCategoria);
 
 module.exports = router;

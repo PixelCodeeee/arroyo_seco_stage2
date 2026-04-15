@@ -11,7 +11,10 @@ const PORT = process.env.PORT || 5000;
 
 app.set('trust proxy', 1);
 
-const allowedOriginsEnv = process.env.NODE_ENV === 'production' ? ['https://arroyoseco.online'] : ['https://arroyoseco.online', 'http://localhost:5173'];
+const allowedOriginsEnv = process.env.NODE_ENV === 'production'
+    ? ['https://arroyoseco.online']
+    : ['https://arroyoseco.online', 'http://localhost:5173'];
+
 const corsOptions = {
     origin: process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : allowedOriginsEnv,
     optionsSuccessStatus: 200
@@ -19,6 +22,7 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 app.use(helmet({ crossOriginResourcePolicy: false }));
+
 // Health check
 app.get('/health', (req, res) => {
     res.json({ status: 'OK', service: 'API Gateway' });
@@ -35,19 +39,17 @@ app.get('/', (req, res) => {
 });
 
 const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, 
-    max: 1000, 
+    windowMs: 15 * 60 * 1000,
+    max: 1000,
     message: { error: 'Too many requests, please try again later.' },
     skip: (req) => process.env.NODE_ENV === 'test'
 });
 app.use(limiter);
 
 // --- PROMETHEUS SETUP ---
-// Enable default metrics collection (CPU, Memory, Event Loop)
 const collectDefaultMetrics = promClient.collectDefaultMetrics;
 collectDefaultMetrics({ prefix: 'arroyo_gateway_' });
 
-// Expose the /metrics endpoint for Prometheus to scrape
 app.get('/metrics', async (req, res) => {
     try {
         res.set('Content-Type', promClient.register.contentType);
@@ -58,17 +60,13 @@ app.get('/metrics', async (req, res) => {
 });
 // ------------------------
 
-
-
 // Logging middleware
 app.use((req, res, next) => {
-    // We don't want to log every single Prometheus scrape, it gets noisy
     if (req.path !== '/metrics') {
         console.log(`[Gateway] ${req.method} ${req.path}`);
     }
     next();
 });
-
 
 // Service URLs
 const AUTH_SERVICE = process.env.AUTH_SERVICE_URL || 'http://localhost:5001';
@@ -76,7 +74,7 @@ const CATALOG_SERVICE = process.env.CATALOG_SERVICE_URL || 'http://localhost:500
 const ORDER_SERVICE = process.env.ORDER_SERVICE_URL || 'http://localhost:5003';
 const RESERVATION_SERVICE = process.env.RESERVATION_SERVICE_URL || 'http://localhost:5004';
 const PAYMENT_SERVICE = process.env.PAYMENT_SERVICE_URL || 'http://localhost:5005';
-const ANNOUNCEMENTS_SERVICE = process.env.ANNOUNCEMENTS_SERVICE_URL || 'http://localhost:5006';
+const ANNOUNCEMENTS_SERVICE = process.env.ANNOUNCEMENTS_SERVICE_URL || 'http://localhost:5007'; // ✅ FIX
 
 // Proxy rules
 const commonProxyOptions = {
@@ -98,21 +96,30 @@ app.use('/api/reservas', proxy(RESERVATION_SERVICE, commonProxyOptions));
 
 app.use('/api/mercadopago', proxy(PAYMENT_SERVICE, {
     ...commonProxyOptions,
-    userResHeaderDecorator(headers, userReq, userRes, proxyReq, proxyRes) {
-        // Explicitly set CORS headers to ensure they are present and singular
-        const checkOrigins = process.env.NODE_ENV === 'production' ? ['https://arroyoseco.online'] : ['https://arroyoseco.online', 'http://localhost:5173'];
-        const allowedOrigins = process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : checkOrigins;
+    userResHeaderDecorator(headers, userReq) {
+        const checkOrigins = process.env.NODE_ENV === 'production'
+            ? ['https://arroyoseco.online']
+            : ['https://arroyoseco.online', 'http://localhost:5173'];
+
+        const allowedOrigins = process.env.FRONTEND_URL
+            ? [process.env.FRONTEND_URL]
+            : checkOrigins;
+
         const reqOrigin = userReq.headers.origin;
-        headers['access-control-allow-origin'] = allowedOrigins.includes(reqOrigin) ? reqOrigin : (process.env.FRONTEND_URL || 'https://arroyoseco.online');
+
+        headers['access-control-allow-origin'] = allowedOrigins.includes(reqOrigin)
+            ? reqOrigin
+            : (process.env.FRONTEND_URL || 'https://arroyoseco.online');
+
         headers['access-control-allow-methods'] = 'GET, POST, PUT, DELETE, OPTIONS';
         headers['access-control-allow-headers'] = 'Content-Type, Authorization';
+
         return headers;
     }
 }));
 
+// ✅ FIX REAL AQUÍ
 app.use('/api/announcements', proxy(ANNOUNCEMENTS_SERVICE, commonProxyOptions));
-
-
 
 if (require.main === module) {
     app.listen(PORT, () => {

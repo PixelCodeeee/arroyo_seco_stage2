@@ -120,6 +120,41 @@ const verifyAdmin = (req, res, next) => {
     }
 };
 
+// Verify if user is admin or moderador
+const verifyAdminOrModerador = (req, res, next) => {
+    try {
+        const token = req.headers.authorization?.split(' ')[1];
+
+        if (!token) {
+            return res.status(401).json({
+                success: false,
+                message: 'Token no proporcionado'
+            });
+        }
+
+        if (!process.env.JWT_SECRET) {
+            throw new Error('JWT_SECRET is not defined');
+        }
+
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+        if (decoded.rol !== 'admin' && decoded.rol !== 'moderador') {
+            return res.status(403).json({
+                success: false,
+                message: 'Requiere privilegios de administrador o moderador'
+            });
+        }
+
+        req.user = decoded;
+        next();
+    } catch (error) {
+        return res.status(401).json({
+            success: false,
+            message: 'Token inválido o expirado'
+        });
+    }
+};
+
 // Optional auth — sets req.user if a valid token is present, but does NOT reject if missing/invalid
 const optionalAuth = (req, res, next) => {
     try {
@@ -138,5 +173,6 @@ module.exports = {
     verifyToken,
     verifyoferente,
     verifyAdmin,
+    verifyAdminOrModerador,
     optionalAuth
 };

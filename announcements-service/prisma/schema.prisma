@@ -154,6 +154,17 @@ model usuario {
   reserva         reserva[]
 }
 
+
+model announcement{
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String?
+  image_url   String?
+  event_date  DateTime?
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+}
+
 enum categoria_tipo {
   gastronomica
   artesanal

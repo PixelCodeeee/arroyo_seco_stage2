@@ -46,7 +46,7 @@ exports.crearProducto = async (req, res, next) => {
             if (!oferenteUser || oferenteUser.id_oferente !== id_oferente) {
                 return res.status(403).json({ error: "No autorizado para crear productos de otro oferente" });
             }
-        } else if (req.user && req.user.rol !== 'admin') {
+        } else if (req.user && req.user.rol !== 'admin' && req.user.rol !== 'moderador') {
             return res.status(403).json({ error: "No autorizado" });
         }
 
@@ -147,7 +147,7 @@ exports.actualizarProducto = async (req, res, next) => {
             if (!oferenteUser || oferenteUser.id_oferente !== productoOriginal.id_oferente) {
                 return res.status(403).json({ error: "No autorizado para modificar este producto" });
             }
-        } else if (req.user && req.user.rol !== 'admin') {
+        } else if (req.user && req.user.rol !== 'admin' && req.user.rol !== 'moderador') {
             return res.status(403).json({ error: "No autorizado" });
         }
 

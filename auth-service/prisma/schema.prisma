@@ -165,6 +165,7 @@ enum usuario_rol {
   turista
   oferente
   admin
+  moderador
 }
 
 enum pedido_estado {

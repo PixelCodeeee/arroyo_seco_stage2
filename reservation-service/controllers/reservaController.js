@@ -121,24 +121,30 @@ exports.obtenerReservas = async (req, res, next) => {
         let reservas = [];
         let stats = null;
 
-        if (req.user.rol === 'admin') {
-            reservas = await Reserva.findAll();
-            stats = await Reserva.getStats();
-        } else if (req.user.rol === 'turista') {
-            reservas = await Reserva.findByUsuarioId(req.user.id);
-        } else if (req.user.rol === 'oferente') {
-            if (!req.user.oferenteId) {
-                // If middleware 'verifyToken' is used instead of 'verifyoferente', oferenteId might be missing.
-                // We should fetch it.
-                const { prisma } = require('../config/db');
-                const oferentes = await prisma.oferente.findMany({ where: { id_usuario: req.user.id } });
-                if (oferentes.length > 0) {
-                    reservas = await Reserva.findByOferenteId(oferentes[0].id_oferente);
-                }
-            } else {
-                reservas = await Reserva.findByOferenteId(req.user.oferenteId);
-            }
+       if (req.user.rol === 'admin' || req.user.rol === 'moderador') {
+    // ✅ admin y moderador ven TODAS las reservas
+    reservas = await Reserva.findAll();
+    stats = await Reserva.getStats();
+
+} else if (req.user.rol === 'turista') {
+    reservas = await Reserva.findByUsuarioId(req.user.id);
+
+} else if (req.user.rol === 'oferente') {
+    if (!req.user.oferenteId) {
+        // If middleware 'verifyToken' is used instead of 'verifyoferente', oferenteId might be missing.
+        // We should fetch it.
+        const { prisma } = require('../config/db');
+        const oferentes = await prisma.oferente.findMany({ 
+            where: { id_usuario: req.user.id } 
+        });
+
+        if (oferentes.length > 0) {
+            reservas = await Reserva.findByOferenteId(oferentes[0].id_oferente);
         }
+    } else {
+        reservas = await Reserva.findByOferenteId(req.user.oferenteId);
+    }
+}
 
         res.json({
             total: reservas.length,
