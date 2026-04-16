@@ -63,6 +63,13 @@
 
         - uses: google-github-actions/setup-gcloud@v2
 
+        - name: Clean OS Login SSH keys
+          run: |
+            KEYS=$(gcloud compute os-login ssh-keys list --format="value(fingerprint)")
+            for key in $KEYS; do
+              gcloud compute os-login ssh-keys remove --fingerprint="$key" || true
+            done
+
         # FIX: SCP to /tmp first, then SSH to move it and fix permissions
         - name: Sync compose file to VM
           run: |
