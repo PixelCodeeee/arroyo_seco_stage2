@@ -77,6 +77,27 @@
               --project=${{ env.PROJECT_ID }} \
               --command="sudo mkdir -p /home/joshualuna/arroyo_seco_stage2 && sudo mv /tmp/docker-compose.yml /home/joshualuna/arroyo_seco_stage2/docker-compose.yml && sudo chown joshualuna:joshualuna /home/joshualuna/arroyo_seco_stage2/docker-compose.yml"
 
+        - name: Sync Prometheus config to VM
+          env:
+            GRAFANA_REMOTE_WRITE_URL: ${{ secrets.GRAFANA_REMOTE_WRITE_URL }}
+            GRAFANA_CLOUD_USER: ${{ secrets.GRAFANA_CLOUD_USER }}
+            GRAFANA_CLOUD_API_KEY: ${{ secrets.GRAFANA_CLOUD_API_KEY }}
+          run: |
+            # Render the template with real credentials
+            envsubst < prometheus/prometheus.yml.tmpl > /tmp/prometheus.yml
+
+            # SCP to VM
+            gcloud compute scp /tmp/prometheus.yml private-backend-vm:/tmp/prometheus.yml \
+              --zone=${{ env.ZONE }} \
+              --tunnel-through-iap \
+              --project=${{ env.PROJECT_ID }}
+
+            gcloud compute ssh private-backend-vm \
+              --zone=${{ env.ZONE }} \
+              --tunnel-through-iap \
+              --project=${{ env.PROJECT_ID }} \
+              --command="sudo mkdir -p /home/joshualuna/arroyo_seco_stage2/prometheus && sudo mv /tmp/prometheus.yml /home/joshualuna/arroyo_seco_stage2/prometheus/prometheus.yml && sudo chown -R joshualuna:joshualuna /home/joshualuna/arroyo_seco_stage2/prometheus"
+
         - name: Pull and restart canary stack
           run: |
             gcloud compute ssh private-backend-vm \
@@ -86,6 +107,10 @@
               --command="
                 echo '${{ secrets.GH_PAT }}' | sudo docker login ghcr.io -u itsjluna --password-stdin
                 cd /home/joshualuna/arroyo_seco_stage2
+
+                # Start infrastructure first (redis + prometheus)
+                sudo docker compose up -d redis-shared prometheus
+                sleep 5
 
                 # Pull and update canary services
                 sudo docker compose pull \

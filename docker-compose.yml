@@ -222,7 +222,7 @@ services:
       - REDIS_URL=redis://redis-shared:6379
 
   # ─────────────────────────────────────────
-  # OBSERVABILITY STACK
+  # OBSERVABILITY STACK (Lightweight — Grafana runs on Cloud)
   # ─────────────────────────────────────────
   prometheus:
     image: prom/prometheus:latest
@@ -233,17 +233,5 @@ services:
       - "9090:9090"
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.retention.time=15d'
-
-  grafana:
-    image: grafana/grafana-oss:latest
-    restart: always
-    ports:
-      - "3000:3000"
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=your_secure_password
-    volumes:
-      - grafana-data:/var/lib/grafana
-
-volumes:
-  grafana-data:
+      - '--storage.tsdb.retention.time=2h'
+      - '--storage.tsdb.retention.size=512MB'

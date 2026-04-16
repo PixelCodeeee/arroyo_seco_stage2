@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const db = require('./config/db');
+const promClient = require('prom-client');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -32,6 +33,20 @@ app.use('/api/carrito', require('./routes/carrito'));
 app.get('/health', (req, res) => {
     res.json({ status: 'OK', service: 'order-service' });
 });
+
+// --- PROMETHEUS METRICS ---
+const collectDefaultMetrics = promClient.collectDefaultMetrics;
+collectDefaultMetrics({ prefix: 'arroyo_order_' });
+
+app.get('/metrics', async (req, res) => {
+    try {
+        res.set('Content-Type', promClient.register.contentType);
+        res.end(await promClient.register.metrics());
+    } catch (ex) {
+        res.status(500).end(ex);
+    }
+});
+// --------------------------
 
 // Database Initialization
 async function initDB() {

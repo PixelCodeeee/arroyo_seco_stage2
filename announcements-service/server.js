@@ -5,6 +5,7 @@ const helmet = require('helmet');
 const { prisma } = require('./config/db');
 const { reservationLimiter } = require('./middleware/rateLimiter');
 const errorHandler = require('./middleware/errorHandler');
+const promClient = require('prom-client');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -29,6 +30,20 @@ app.use('/api', reservationLimiter);
 app.get('/health', (req, res) => {
     res.json({ status: 'OK', service: 'announcements-service' });
 });
+
+// --- PROMETHEUS METRICS ---
+const collectDefaultMetrics = promClient.collectDefaultMetrics;
+collectDefaultMetrics({ prefix: 'arroyo_announcements_' });
+
+app.get('/metrics', async (req, res) => {
+    try {
+        res.set('Content-Type', promClient.register.contentType);
+        res.end(await promClient.register.metrics());
+    } catch (ex) {
+        res.status(500).end(ex);
+    }
+});
+// --------------------------
 
 // Routes
 app.use('/api/announcements', require('./routes/announcement'));

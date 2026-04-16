@@ -1,0 +1,92 @@
+# Prometheus Configuration for Arroyo Seco - Hybrid Cloud
+# Local Prometheus scrapes all services and pushes to Grafana Cloud
+# via remote_write. This file is templated — CI runs envsubst before deployment.
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+# ─────────────────────────────────────────
+# Remote Write to Grafana Cloud
+# ─────────────────────────────────────────
+remote_write:
+  - url: "${GRAFANA_REMOTE_WRITE_URL}"
+    basic_auth:
+      username: "${GRAFANA_CLOUD_USER}"
+      password: "${GRAFANA_CLOUD_API_KEY}"
+
+# ─────────────────────────────────────────
+# Scrape Configurations
+# ─────────────────────────────────────────
+scrape_configs:
+  # --- STABLE STACK ---
+  - job_name: 'api-gateway-stable'
+    static_configs:
+      - targets: ['api-gateway-stable:5000']
+    metrics_path: '/metrics'
+
+  - job_name: 'auth-service-stable'
+    static_configs:
+      - targets: ['auth-service-stable:5001']
+    metrics_path: '/metrics'
+
+  - job_name: 'catalog-service-stable'
+    static_configs:
+      - targets: ['catalog-service-stable:5002']
+    metrics_path: '/metrics'
+
+  - job_name: 'order-service-stable'
+    static_configs:
+      - targets: ['order-service-stable:5003']
+    metrics_path: '/metrics'
+
+  - job_name: 'reservation-service-stable'
+    static_configs:
+      - targets: ['reservation-service-stable:5004']
+    metrics_path: '/metrics'
+
+  - job_name: 'payment-service-stable'
+    static_configs:
+      - targets: ['payment-service-stable:5005']
+    metrics_path: '/metrics'
+
+  - job_name: 'announcements-service-stable'
+    static_configs:
+      - targets: ['announcements-service-stable:5006']
+    metrics_path: '/metrics'
+
+  # --- CANARY STACK ---
+  - job_name: 'api-gateway-canary'
+    static_configs:
+      - targets: ['api-gateway-canary:5000']
+    metrics_path: '/metrics'
+
+  - job_name: 'auth-service-canary'
+    static_configs:
+      - targets: ['auth-service-canary:5101']
+    metrics_path: '/metrics'
+
+  - job_name: 'catalog-service-canary'
+    static_configs:
+      - targets: ['catalog-service-canary:5102']
+    metrics_path: '/metrics'
+
+  - job_name: 'order-service-canary'
+    static_configs:
+      - targets: ['order-service-canary:5103']
+    metrics_path: '/metrics'
+
+  - job_name: 'reservation-service-canary'
+    static_configs:
+      - targets: ['reservation-service-canary:5104']
+    metrics_path: '/metrics'
+
+  - job_name: 'payment-service-canary'
+    static_configs:
+      - targets: ['payment-service-canary:5105']
+    metrics_path: '/metrics'
+
+  - job_name: 'announcements-service-canary'
+    static_configs:
+      - targets: ['announcements-service-canary:5106']
+    metrics_path: '/metrics'
