@@ -97,12 +97,14 @@
             gcloud compute scp /tmp/prometheus.yml private-backend-vm:/tmp/prometheus.yml \
               --zone=${{ env.ZONE }} \
               --tunnel-through-iap \
-              --project=${{ env.PROJECT_ID }}
+              --project=${{ env.PROJECT_ID }} \
+              --ssh-key-expire-after=2m
 
             gcloud compute ssh private-backend-vm \
               --zone=${{ env.ZONE }} \
               --tunnel-through-iap \
               --project=${{ env.PROJECT_ID }} \
+              --ssh-key-expire-after=2m \
               --command="sudo mkdir -p /home/joshualuna/arroyo_seco_stage2/prometheus && sudo mv /tmp/prometheus.yml /home/joshualuna/arroyo_seco_stage2/prometheus/prometheus.yml && sudo chown -R joshualuna:joshualuna /home/joshualuna/arroyo_seco_stage2/prometheus"
 
         - name: Pull and restart canary stack
@@ -111,6 +113,7 @@
               --zone=${{ env.ZONE }} \
               --tunnel-through-iap \
               --project=${{ env.PROJECT_ID }} \
+              --ssh-key-expire-after=2m \
               --command="
                 echo '${{ secrets.GH_PAT }}' | sudo docker login ghcr.io -u itsjluna --password-stdin
                 cd /home/joshualuna/arroyo_seco_stage2
