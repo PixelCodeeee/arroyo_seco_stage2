@@ -69,6 +69,7 @@
             for key in $KEYS; do
               gcloud compute os-login ssh-keys remove --fingerprint="$key" || true
             done
+
         - name: Sync compose file to VM
           run: |
             gcloud compute scp docker-compose.yml private-backend-vm:/tmp/docker-compose.yml \
@@ -83,8 +84,7 @@
               --project=${{ env.PROJECT_ID }} \
               --ssh-key-expire-after=2m \
               --command="sudo mkdir -p /home/joshualuna/arroyo_seco_stage2 && sudo mv /tmp/docker-compose.yml /home/joshualuna/arroyo_seco_stage2/docker-compose.yml && sudo chown joshualuna:joshualuna /home/joshualuna/arroyo_seco_stage2/docker-compose.yml"
-    
-              - name: Sync Prometheus config to VM
+        - name: Sync Prometheus config to VM
           env:
             GRAFANA_REMOTE_WRITE_URL: ${{ secrets.GRAFANA_REMOTE_WRITE_URL }}
             GRAFANA_CLOUD_USER: ${{ secrets.GRAFANA_CLOUD_USER }}
