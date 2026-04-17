@@ -101,6 +101,7 @@ services:
       - MP_REDIRECT_URI=https://api.arroyoseco.online/api/mercadopago/mp/callback
       - MP_API_URL=https://api.mercadopago.com
       - APP_URL=https://arroyoseco.online
+      - ULTRA_PUSH=1234
 
   announcements-service-stable:
     image: ghcr.io/pixelcodeeee/arroyo_seco_stage2/announcements-service:stable
